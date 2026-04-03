@@ -331,4 +331,38 @@ router.get('/invoices', authenticateToken, async (req, res) => {
   }
 });
 
+// ======================
+// CLIENT APPROVES INVOICE
+// ======================
+router.post('/invoices/:id/approve', authenticateToken, async (req, res) => {
+  const invoiceId = req.params.id;
+
+  try {
+    // Optional: Verify the invoice belongs to the authenticated user (if needed)
+    // const supplierId = req.user.userId || req.user.id;
+
+    const { triggerAdvanceAfterApproval } = require('../utils/invoiceService');
+
+    const result = await triggerAdvanceAfterApproval(invoiceId);
+
+    if (result.success) {
+      res.json({
+        message: "Invoice approved successfully",
+        advanceAmount: result.advanceAmount,
+        status: "approved"
+      });
+    } else {
+      res.status(400).json({
+        error: result.message || "Failed to process approval"
+      });
+    }
+  } catch (error) {
+    console.error("Error approving invoice:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
+
+
 module.exports = router;
