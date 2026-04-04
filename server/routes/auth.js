@@ -484,11 +484,18 @@ router.post('/invoices/:identifier/client-decision', async (req, res) => {
 // ======================
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 
-// Configure multer for file upload
+// Ensure upload directory exists (put this near the top of auth.js or in server.js)
+const uploadDir = path.join(__dirname, '../uploads/invoices');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// Multer configuration
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, 'uploads/invoices/');   // Make sure this folder exists
+    cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -496,25 +503,18 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({ 
+const upload = multer({
   storage: storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
   fileFilter: function (req, file, cb) {
-    const allowedTypes = /pdf|jpg|jpeg|png/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const allowed = /pdf|jpg|jpeg|png/;
+    const extname = allowed.test(path.extname(file.originalname).toLowerCase());
     if (extname) {
       return cb(null, true);
     }
     cb(new Error('Only PDF, JPG, JPEG, and PNG files are allowed'));
   }
 });
-
-// Create uploads folder if it doesn't exist (add this at top of server.js if needed)
-const fs = require('fs');
-const uploadDir = 'uploads/invoices';
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
 
 // ======================
 // UPLOAD ROUTE
@@ -532,7 +532,6 @@ router.post('/invoices/upload', authenticateToken, upload.single('file'), async 
       term_days
     } = req.body;
 
-    // Validation
     if (!req.file) {
       return res.status(400).json({ error: "Please upload an invoice file" });
     }
@@ -542,14 +541,14 @@ router.post('/invoices/upload', authenticateToken, upload.single('file'), async 
     }
 
     const invoiceId = uuidv4();
-    const filePath = req.file.path;   // e.g. "uploads/invoices/1234567890-abc123.pdf"
+    const filePath = req.file.path.replace(/\\/g, '/'); // normalize slashes
 
-    // Insert invoice into database
+    // Insert the invoice
     const insertQuery = `
       INSERT INTO invoices (
         id, supplier_id, customer_id, invoice_number, total_amount,
-        issue_date, due_date, status, description, term_days, 
-        file_path, created_at, updated_at
+        issue_date, due_date, status, description, term_days, file_path,
+        created_at, updated_at
       ) VALUES ($1, $2, $3, $4, $5, CURRENT_DATE, $6, 'pending', $7, $8, $9, NOW(), NOW())
       RETURNING id, invoice_number, total_amount, due_date
     `;
@@ -569,10 +568,7 @@ router.post('/invoices/upload', authenticateToken, upload.single('file'), async 
     const newInvoice = result.rows[0];
 
     // Get client email
-    const clientResult = await pool.query(
-      "SELECT email FROM customers WHERE id = $1", 
-      [client_id]
-    );
+    const clientResult = await pool.query("SELECT email FROM customers WHERE id = $1", [client_id]);
 
     if (clientResult.rows.length === 0) {
       return res.status(404).json({ error: "Client not found" });
@@ -581,31 +577,23 @@ router.post('/invoices/upload', authenticateToken, upload.single('file'), async 
     const clientEmail = clientResult.rows[0].email;
 
     // Get supplier business name
-    const supplierResult = await pool.query(
-      "SELECT business_name FROM suppliers WHERE id = $1", 
-      [supplierId]
-    );
-
+    const supplierResult = await pool.query("SELECT business_name FROM suppliers WHERE id = $1", [supplierId]);
     const supplierBusiness = supplierResult.rows[0]?.business_name || "Your Supplier";
 
-    // Send approval request email to client
+    // Send approval request email to the client
     const { sendApprovalRequestEmail } = require('../utils/mailService');
 
-    const emailSent = await sendApprovalRequestEmail(
-      clientEmail, 
-      newInvoice, 
-      supplierBusiness
-    );
+    const emailSent = await sendApprovalRequestEmail(clientEmail, newInvoice, supplierBusiness);
 
     res.status(201).json({
       success: true,
-      message: "Invoice uploaded successfully. Approval request sent to client.",
+      message: "Invoice uploaded successfully. Approval request sent to the client.",
       invoice: {
         id: newInvoice.id,
         invoice_number: newInvoice.invoice_number
       },
       filePath: filePath,
-      emailSent: emailSent
+      emailSent
     });
 
   } catch (error) {
