@@ -15,6 +15,7 @@ import DashboardHome from './DashboardHome';
 import Upload from './Upload';
 import Invoices from './Invoices';
 import Profile from './Profile';
+import ApproveInvoice from './pages/ApproveInvoice';
 
 function App() {
   return (
@@ -26,6 +27,7 @@ function App() {
           <Route path="/signup" element={<Signup />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/approve/:invoiceId" element={<ApproveInvoice />} />
           <Route path="/dashboard" element={<ProtectedRoute element={<Dashboard />} />}>
             <Route index element={<DashboardHome />} />
             <Route path="upload" element={<Upload />} />
