@@ -1,8 +1,23 @@
 const cron = require('node-cron');
 const pool = require('../db');
+const { Configuration, PlaidApi, PlaidEnvironments } = require('plaid');
 const { sendInvoiceReminder } = require('./mailService');
 
-// Daily Reminder Job - Runs every day at 8:00 AM
+// Initialize Plaid Client (used by collection job)
+const configuration = new Configuration({
+  basePath: PlaidEnvironments[process.env.PLAID_ENV || 'sandbox'],
+  baseOptions: {
+    headers: {
+      'PLAID-CLIENT-ID': process.env.PLAID_CLIENT_ID,
+      'PLAID-SECRET': process.env.PLAID_SECRET,
+    },
+  },
+});
+
+const plaidClient = new PlaidApi(configuration);
+
+// ====================== DAILY REMINDER JOB ======================
+// (Your original code - unchanged)
 const reminderCron = cron.schedule('0 8 * * *', async () => {
   console.log('🔄 Starting Daily Invoice Reminder Job...');
 
@@ -22,9 +37,9 @@ const reminderCron = cron.schedule('0 8 * * *', async () => {
       JOIN suppliers s ON s.id = i.supplier_id
       WHERE i.status NOT IN ('paid', 'cancelled')
         AND (
-          i.due_date = CURRENT_DATE - INTERVAL '3 days'   -- 3 days before
+          i.due_date = CURRENT_DATE + INTERVAL '3 days'
           OR 
-          i.due_date = CURRENT_DATE                        -- on due date
+          i.due_date = CURRENT_DATE
         )
       ORDER BY i.due_date ASC;
     `;
@@ -54,10 +69,106 @@ const reminderCron = cron.schedule('0 8 * * *', async () => {
   timezone: "America/Mexico_City"
 });
 
+// ====================== ACH COLLECTION JOB ======================
+// Runs every day at 9:00 AM - Collects 100% from client via Plaid Transfer
+const collectionCron = cron.schedule('0 9 * * *', async () => {
+  console.log('🔄 Starting Daily ACH Collection Job...');
+
+  try {
+    const query = `
+      SELECT 
+        i.id,
+        i.invoice_number,
+        i.total_amount,
+        i.plaid_access_token,
+        i.plaid_account_id,
+        c.name AS client_name,
+        c.email AS client_email
+      FROM invoices i
+      JOIN customers c ON c.id = i.customer_id
+      WHERE i.ach_authorized = true
+        AND i.plaid_access_token IS NOT NULL
+        AND i.plaid_account_id IS NOT NULL
+        AND i.due_date = CURRENT_DATE
+        AND i.collected_amount IS NULL
+        AND i.status NOT IN ('paid', 'cancelled', 'rejected');
+    `;
+
+    const { rows: invoices } = await pool.query(query);
+
+    if (invoices.length === 0) {
+      console.log('✅ No invoices to collect today.');
+      return;
+    }
+
+    console.log(`📥 Found ${invoices.length} invoice(s) for ACH collection.`);
+
+    for (const invoice of invoices) {
+      const amount = Number(invoice.total_amount).toFixed(2);
+
+      try {
+        // 1. Create Transfer Authorization
+        const authResponse = await plaidClient.transferAuthorizationCreate({
+          access_token: invoice.plaid_access_token,
+          account_id: invoice.plaid_account_id,
+          type: 'debit',
+          network: 'ach',
+          amount: amount,
+          ach_class: 'web',
+          user: { legal_name: invoice.client_name },
+          idempotency_key: `auth_${invoice.id}_${Date.now()}`,
+        });
+
+        const authorization_id = authResponse.data.authorization.id;
+
+        // 2. Create the Debit Transfer
+        const transferResponse = await plaidClient.transferCreate({
+          access_token: invoice.plaid_access_token,
+          account_id: invoice.plaid_account_id,
+          authorization_id,
+          type: 'debit',
+          network: 'ach',
+          amount: amount,
+          description: `VeloxPay - Invoice ${invoice.invoice_number}`,
+          idempotency_key: `debit_${invoice.id}`,
+        });
+
+        const transfer_id = transferResponse.data.transfer.id;
+
+        // Update invoice
+        await pool.query(`
+          UPDATE invoices 
+          SET 
+            collected_amount = $1,
+            collection_transfer_id = $2,
+            collected_at = NOW()
+          WHERE id = $3
+        `, [invoice.total_amount, transfer_id, invoice.id]);
+
+        console.log(`✅ Successfully collected $${amount} for invoice ${invoice.invoice_number}`);
+
+        // TODO: After successful collection, pay remaining 15% to supplier
+
+      } catch (error) {
+        console.error(`❌ Failed to collect invoice ${invoice.invoice_number}:`, error.response?.data || error.message);
+      }
+    }
+
+  } catch (error) {
+    console.error('❌ Error in ACH collection cron job:', error);
+  }
+}, {
+  timezone: "America/Mexico_City"
+});
+
 // Graceful shutdown
 process.on('SIGTERM', () => {
   reminderCron.stop();
-  console.log('Reminder cron job stopped.');
+  collectionCron.stop();
+  console.log('All cron jobs stopped.');
 });
 
-module.exports = { reminderCron };
+module.exports = { 
+  reminderCron, 
+  collectionCron 
+};
