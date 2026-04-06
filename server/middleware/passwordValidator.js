@@ -1,5 +1,3 @@
-// middleware/passwordValidator.js
-
 const passwordValidator = (req, res, next) => {
   const { password } = req.body;
 

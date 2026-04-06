@@ -17,7 +17,6 @@ const configuration = new Configuration({
 const plaidClient = new PlaidApi(configuration);
 
 // ====================== DAILY REMINDER JOB ======================
-// (Your original code - unchanged)
 const reminderCron = cron.schedule('0 8 * * *', async () => {
   console.log('🔄 Starting Daily Invoice Reminder Job...');
 

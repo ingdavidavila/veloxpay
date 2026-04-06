@@ -1,8 +1,8 @@
-// routes/plaid.js
 const express = require('express');
 const router = express.Router();
 const { Configuration, PlaidApi, PlaidEnvironments } = require('plaid');
-const pool = require('../db');   // This matches your db.js in root
+const pool = require('../db');   
+const authenticateToken = require('../middleware/authenticateToken');
 
 // Initialize Plaid Client
 const configuration = new Configuration({
@@ -34,11 +34,9 @@ router.post('/create-link-token', async (req, res) => {
         client_user_id: `invoice_${invoice_id}` 
       },
       client_name: 'VeloxPay',
-      products: ['transfer'],                    // This is the important one
+      products: ['transfer'],                    
       country_codes: ['US'],
       language: 'en',
-      // Remove the problematic transfer.type and account_filters for now
-      // We can add more options later if needed
     });
 
     res.json({ 
@@ -59,7 +57,7 @@ router.post('/exchange-public-token', async (req, res) => {
   const { public_token, invoice_id, account_id, metadata } = req.body;
 
   if (!public_token || !invoice_id || !account_id) {
-    return res.status(400).json({ error: 'public_token, invoice_id and account_id are required' });
+    return res.status(400).json({ error: 'Missing required fields' });
   }
 
   try {
@@ -83,6 +81,88 @@ router.post('/exchange-public-token', async (req, res) => {
     res.status(500).json({ 
       success: false,
       error: error.response?.data?.error_message || 'Failed to exchange token' 
+    });
+  }
+});
+
+// ==================== SUPPLIER SIDE - NEW ROUTES ====================
+
+// Create Link Token for Supplier (to receive 85% advance - ACH Credit)
+router.post('/supplier-link-token', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user?.userId;     // This matches your JWT payload
+
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const linkTokenResponse = await plaidClient.linkTokenCreate({
+      user: { client_user_id: `supplier_${userId}` },
+      client_name: 'VeloxPay',
+      products: ['transfer'],
+      country_codes: ['US'],
+      language: 'en',
+    });
+
+    res.json({ 
+      success: true,
+      link_token: linkTokenResponse.data.link_token 
+    });
+  } catch (error) {
+    console.error('Supplier Link Token Error:', error.response?.data || error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.response?.data?.error_message || 'Failed to create link token' 
+    });
+  }
+});
+
+// Exchange Public Token and Save Supplier's Bank Account
+router.post('/supplier-exchange-token', authenticateToken, async (req, res) => {
+  const { public_token, account_id, metadata } = req.body;
+
+  if (!public_token || !account_id) {
+    return res.status(400).json({ success: false, error: 'public_token and account_id are required' });
+  }
+
+  try {
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const exchangeResponse = await plaidClient.itemPublicTokenExchange({ public_token });
+    const access_token = exchangeResponse.data.access_token;
+
+    // Save supplier's Plaid tokens
+    await pool.query(`
+      UPDATE suppliers 
+      SET 
+        plaid_access_token = $1,
+        plaid_account_id = $2,
+        plaid_metadata = $3,
+        bank_connected = true,
+        bank_connected_at = NOW()
+      WHERE id = $4
+    `, [access_token, account_id, JSON.stringify(metadata || {}), userId]);
+
+    // Copy tokens to unpaid invoices for this supplier
+    await pool.query(`
+      UPDATE invoices 
+      SET 
+        supplier_plaid_access_token = $1,
+        supplier_plaid_account_id = $2
+      WHERE supplier_id = $3 
+        AND advance_sent = false
+    `, [access_token, account_id, userId]);
+
+    res.json({ success: true, message: 'Bank account connected successfully' });
+  } catch (error) {
+    console.error('Supplier Exchange Token Error:', error.response?.data || error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.response?.data?.error_message || 'Failed to save bank account' 
     });
   }
 });

@@ -1,52 +1,56 @@
 import React, { useState, useEffect } from 'react';
-import './App.css';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './useAuth';
+import { usePlaidLink } from 'react-plaid-link';
 
 function Profile() {
   const navigate = useNavigate();
   const { user, logout, updateUser } = useAuth();
+
   const [isEditing, setIsEditing] = useState(false);
+  const [bankConnected, setBankConnected] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [linkToken, setLinkToken] = useState(null);
+  const [error, setError] = useState(null);
+
+  const [profileData, setProfileData] = useState({
+    businessName: '',
+    email: '',
+    phone: '',
+  });
+
   const [stats, setStats] = useState({
     totalInvoices: 0,
     totalEarned: 0,
     approved: 0,
   });
-  const [profileData, setProfileData] = useState({
-    businessName: '',
-    email: '',
-    phone: '',
-    bankAccount: '****7890'
-  });
-  const [loading, setLoading] = useState(true);
 
+  // Fetch user data and stats
   useEffect(() => {
-    // Initialize profile data from user context
     if (user) {
-      setProfileData(prev => ({
-        ...prev,
+      setProfileData({
         businessName: user.business_name || user.name || '',
         email: user.email || '',
         phone: user.phone || '',
-      }));
+      });
+
+      // Check if supplier has connected a bank account
+      setBankConnected(!!user.supplier_plaid_access_token || !!user.has_bank_account);
     }
 
-    // Fetch user stats
     const fetchStats = async () => {
       try {
         const token = localStorage.getItem('token');
         const response = await fetch('http://localhost:5000/api/invoices/stats', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
+          headers: { 'Authorization': `Bearer ${token}` }
         });
 
         if (response.ok) {
           const data = await response.json();
           setStats({
-            totalInvoices: data.pending + data.approved + data.paid,
+            totalInvoices: (data.pending || 0) + (data.approved || 0) + (data.paid || 0),
             totalEarned: (data.pendingAmount || 0) + (data.approvedAmount || 0) + (data.paidAmount || 0),
-            approved: data.approved,
+            approved: data.approved || 0,
           });
         }
       } catch (error) {
@@ -63,10 +67,7 @@ function Profile() {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setProfileData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setProfileData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSaveChanges = async () => {
@@ -98,10 +99,77 @@ function Profile() {
     }
   };
 
+  // Get Plaid Link Token for Supplier Bank (for receiving 85% advance)
+  const getSupplierLinkToken = async () => {
+    setError(null);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:5000/api/plaid/supplier-link-token', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setLinkToken(data.link_token);
+      } else {
+        setError(data.error || 'Failed to initialize bank connection');
+      }
+    } catch (err) {
+      setError('Network error. Please try again.');
+      console.error(err);
+    }
+  };
+
+  // Handle successful Plaid connection
+  const onPlaidSuccess = async (public_token, metadata) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:5000/api/plaid/supplier-exchange-token', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          public_token,
+          account_id: metadata.accounts[0]?.id,
+          metadata
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert('✅ Bank account connected successfully!\n\nYou can now receive 85% advances automatically when invoices are approved.');
+        setBankConnected(true);
+        window.location.reload(); // Refresh user data
+      } else {
+        alert('Failed to save bank account. Please try again.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Something went wrong while saving your bank account.');
+    }
+  };
+
+  const { open, ready } = usePlaidLink({
+    token: linkToken,
+    onSuccess: onPlaidSuccess,
+    onExit: (err) => {
+      if (err) console.error('Plaid Link exited with error:', err);
+    }
+  });
+
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
+
+  if (loading) return <p>Loading profile...</p>;
 
   return (
     <main className="dashboard-main">
@@ -185,14 +253,76 @@ function Profile() {
               </div>
             </div>
 
-            <div className="detail-item">
-              <i className="bi bi-credit-card"></i>
-              <div>
-                <label>Bank Account</label>
-                <p>{!isEditing ? profileData.bankAccount : <input type="text" name="bankAccount" value={profileData.bankAccount} onChange={handleInputChange} />}</p>
+            {/* Improved Bank Account Section */}
+            <div className="detail-item" style={{ marginTop: '25px', padding: '18px', border: '2px solid #4CAF50', borderRadius: '10px', backgroundColor: '#f8fff8' }}>
+              <i className="bi bi-credit-card" style={{ color: '#4CAF50', fontSize: '24px' }}></i>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontWeight: 'bold', fontSize: '16px' }}>
+                  Receiving Bank Account (for 85% Advances)
+                </label>
+                
+                {bankConnected ? (
+                  <div>
+                    <p style={{ color: 'green', fontWeight: 'bold', margin: '8px 0' }}>
+                      ✅ Bank account is connected and ready to receive automatic 85% advances.
+                    </p>
+                    <button 
+                      onClick={getSupplierLinkToken}
+                      style={{ 
+                        padding: '9px 18px', 
+                        backgroundColor: '#6c757d', 
+                        color: 'white', 
+                        border: 'none', 
+                        borderRadius: '5px',
+                        fontSize: '14px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Change Bank Account
+                    </button>
+                  </div>
+                ) : (
+                  <div>
+                    <p style={{ margin: '8px 0' }}>No bank account connected yet.</p>
+                    <button 
+                      onClick={getSupplierLinkToken}
+                      style={{ 
+                        padding: '12px 20px', 
+                        backgroundColor: '#007bff', 
+                        color: 'white', 
+                        border: 'none', 
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '15px'
+                      }}
+                    >
+                      Connect Bank Account for 85% Advances
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
+
+          {/* Show Plaid Open Button when linkToken is ready */}
+          {linkToken && (
+            <button 
+              onClick={() => open()} 
+              disabled={!ready}
+              style={{ 
+                marginTop: '12px', 
+                padding: '12px 24px', 
+                backgroundColor: '#28a745', 
+                color: 'white', 
+                border: 'none', 
+                borderRadius: '6px',
+                fontSize: '16px',
+                width: '100%'
+              }}
+            >
+              {ready ? 'Open Secure Bank Login' : 'Loading secure connection...'}
+            </button>
+          )}
 
           {isEditing && (
             <div className="edit-actions">
