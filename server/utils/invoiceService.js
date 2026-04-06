@@ -1,18 +1,6 @@
 // utils/invoiceService.js
 const pool = require('../db');
-const { Configuration, PlaidApi, PlaidEnvironments } = require('plaid');
-
-const configuration = new Configuration({
-  basePath: PlaidEnvironments[process.env.PLAID_ENV || 'sandbox'],
-  baseOptions: {
-    headers: {
-      'PLAID_CLIENT-ID': process.env.PLAID_CLIENT_ID,
-      'PLAID-SECRET': process.env.PLAID_SECRET,
-    },
-  },
-});
-
-const plaidClient = new PlaidApi(configuration);
+const plaidClient = require('./plaidService');   // ← Use shared service
 
 const triggerAdvanceAfterApproval = async (invoiceId) => {
   try {
@@ -48,23 +36,19 @@ const triggerAdvanceAfterApproval = async (invoiceId) => {
     const advanceAmount = Math.round(invoice.total_amount * 0.85 * 100) / 100;
 
     try {
-      // 1. Create Authorization for Credit Transfer
       const authResponse = await plaidClient.transferAuthorizationCreate({
         access_token: invoice.supplier_plaid_access_token,
         account_id: invoice.supplier_plaid_account_id,
-        type: 'credit',                       // Sending money TO supplier
+        type: 'credit',
         network: 'ach',
         amount: advanceAmount.toFixed(2),
-        ach_class: 'ccd',                     // CCD = Corporate Credit
-        user: { 
-          legal_name: invoice.supplier_name 
-        },
+        ach_class: 'ccd',
+        user: { legal_name: invoice.supplier_name },
         idempotency_key: `advance_${invoiceId}_${Date.now()}`,
       });
 
       const authorization_id = authResponse.data.authorization.id;
 
-      // 2. Execute the Credit Transfer
       const transferResponse = await plaidClient.transferCreate({
         access_token: invoice.supplier_plaid_access_token,
         account_id: invoice.supplier_plaid_account_id,
@@ -78,7 +62,6 @@ const triggerAdvanceAfterApproval = async (invoiceId) => {
 
       const transfer_id = transferResponse.data.transfer.id;
 
-      // Update invoice
       await pool.query(`
         UPDATE invoices 
         SET 

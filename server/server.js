@@ -1,4 +1,3 @@
-// server.js
 require('dotenv').config();
 
 const express = require("express");
@@ -6,6 +5,7 @@ const cors = require("cors");
 
 const authRoutes = require("./routes/auth");
 const plaidRoutes = require('./routes/plaid');
+const invoiceRoutes = require('./routes/invoices'); 
 
 // Import cron jobs (this will start them automatically)
 const { reminderCron, collectionCron } = require('./utils/cronJobs');
@@ -27,6 +27,7 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use("/api", authRoutes);
 app.use('/api/plaid', plaidRoutes);
+app.use('/api/invoices', invoiceRoutes); 
 
 // ====================== CRON JOBS STATUS ======================
 console.log('🚀 Server starting...');

@@ -1,40 +1,24 @@
 const express = require('express');
 const router = express.Router();
-const { Configuration, PlaidApi, PlaidEnvironments } = require('plaid');
-const pool = require('../db');   
-const authenticateToken = require('../middleware/authenticateToken');
+const plaidClient = require('../utils/plaidService');   // ← Use shared service
+const pool = require('../db');
+const authenticateToken = require('../middleware/auth.js');
 
-// Initialize Plaid Client
-const configuration = new Configuration({
-  basePath: PlaidEnvironments[process.env.PLAID_ENV || 'sandbox'],
-  baseOptions: {
-    headers: {
-      'PLAID-CLIENT-ID': process.env.PLAID_CLIENT_ID,
-      'PLAID-SECRET': process.env.PLAID_SECRET,
-    },
-  },
-});
+// ====================== CLIENT SIDE (Debit from client) ======================
 
-const plaidClient = new PlaidApi(configuration);
-
-// ====================== CREATE LINK TOKEN ======================
+// Create Link Token for Client
 router.post('/create-link-token', async (req, res) => {
-  const { invoice_id, amount, due_date } = req.body;
+  const { invoice_id, amount } = req.body;
 
   if (!invoice_id || !amount) {
-    return res.status(400).json({ 
-      success: false, 
-      error: 'invoice_id and amount are required' 
-    });
+    return res.status(400).json({ success: false, error: 'invoice_id and amount are required' });
   }
 
   try {
     const linkTokenResponse = await plaidClient.linkTokenCreate({
-      user: { 
-        client_user_id: `invoice_${invoice_id}` 
-      },
+      user: { client_user_id: `invoice_${invoice_id}` },
       client_name: 'VeloxPay',
-      products: ['transfer'],                    
+      products: ['transfer'],
       country_codes: ['US'],
       language: 'en',
     });
@@ -52,12 +36,12 @@ router.post('/create-link-token', async (req, res) => {
   }
 });
 
-// ====================== EXCHANGE PUBLIC TOKEN ======================
+// Exchange Public Token for Client
 router.post('/exchange-public-token', async (req, res) => {
   const { public_token, invoice_id, account_id, metadata } = req.body;
 
   if (!public_token || !invoice_id || !account_id) {
-    return res.status(400).json({ error: 'Missing required fields' });
+    return res.status(400).json({ success: false, error: 'Missing required fields' });
   }
 
   try {
@@ -78,19 +62,16 @@ router.post('/exchange-public-token', async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('Plaid Exchange Token Error:', error.response?.data || error);
-    res.status(500).json({ 
-      success: false,
-      error: error.response?.data?.error_message || 'Failed to exchange token' 
-    });
+    res.status(500).json({ success: false, error: 'Failed to exchange token' });
   }
 });
 
-// ==================== SUPPLIER SIDE - NEW ROUTES ====================
+// ====================== SUPPLIER SIDE (Credit to supplier) ======================
 
-// Create Link Token for Supplier (to receive 85% advance - ACH Credit)
+// Create Link Token for Supplier
 router.post('/supplier-link-token', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user?.userId;     // This matches your JWT payload
+    const userId = req.user?.userId || req.user?.id;
 
     if (!userId) {
       return res.status(401).json({ success: false, error: 'Unauthorized' });
@@ -117,7 +98,7 @@ router.post('/supplier-link-token', authenticateToken, async (req, res) => {
   }
 });
 
-// Exchange Public Token and Save Supplier's Bank Account
+// Exchange Public Token for Supplier
 router.post('/supplier-exchange-token', authenticateToken, async (req, res) => {
   const { public_token, account_id, metadata } = req.body;
 
@@ -126,7 +107,7 @@ router.post('/supplier-exchange-token', authenticateToken, async (req, res) => {
   }
 
   try {
-    const userId = req.user?.userId;
+    const userId = req.user?.userId || req.user?.id;
 
     if (!userId) {
       return res.status(401).json({ success: false, error: 'Unauthorized' });
@@ -135,7 +116,7 @@ router.post('/supplier-exchange-token', authenticateToken, async (req, res) => {
     const exchangeResponse = await plaidClient.itemPublicTokenExchange({ public_token });
     const access_token = exchangeResponse.data.access_token;
 
-    // Save supplier's Plaid tokens
+    // Save to suppliers table
     await pool.query(`
       UPDATE suppliers 
       SET 
@@ -147,14 +128,13 @@ router.post('/supplier-exchange-token', authenticateToken, async (req, res) => {
       WHERE id = $4
     `, [access_token, account_id, JSON.stringify(metadata || {}), userId]);
 
-    // Copy tokens to unpaid invoices for this supplier
+    // Copy to unpaid invoices
     await pool.query(`
       UPDATE invoices 
       SET 
         supplier_plaid_access_token = $1,
         supplier_plaid_account_id = $2
-      WHERE supplier_id = $3 
-        AND advance_sent = false
+      WHERE supplier_id = $3 AND advance_sent = false
     `, [access_token, account_id, userId]);
 
     res.json({ success: true, message: 'Bank account connected successfully' });

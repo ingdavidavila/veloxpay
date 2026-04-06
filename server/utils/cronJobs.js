@@ -1,20 +1,7 @@
 const cron = require('node-cron');
 const pool = require('../db');
-const { Configuration, PlaidApi, PlaidEnvironments } = require('plaid');
+const plaidClient = require('./plaidService');        // ← Use shared service
 const { sendInvoiceReminder } = require('./mailService');
-
-// Initialize Plaid Client (used by collection job)
-const configuration = new Configuration({
-  basePath: PlaidEnvironments[process.env.PLAID_ENV || 'sandbox'],
-  baseOptions: {
-    headers: {
-      'PLAID-CLIENT-ID': process.env.PLAID_CLIENT_ID,
-      'PLAID-SECRET': process.env.PLAID_SECRET,
-    },
-  },
-});
-
-const plaidClient = new PlaidApi(configuration);
 
 // ====================== DAILY REMINDER JOB ======================
 const reminderCron = cron.schedule('0 8 * * *', async () => {
@@ -69,7 +56,6 @@ const reminderCron = cron.schedule('0 8 * * *', async () => {
 });
 
 // ====================== ACH COLLECTION JOB ======================
-// Runs every day at 9:00 AM - Collects 100% from client via Plaid Transfer
 const collectionCron = cron.schedule('0 9 * * *', async () => {
   console.log('🔄 Starting Daily ACH Collection Job...');
 
@@ -106,7 +92,6 @@ const collectionCron = cron.schedule('0 9 * * *', async () => {
       const amount = Number(invoice.total_amount).toFixed(2);
 
       try {
-        // 1. Create Transfer Authorization
         const authResponse = await plaidClient.transferAuthorizationCreate({
           access_token: invoice.plaid_access_token,
           account_id: invoice.plaid_account_id,
@@ -120,7 +105,6 @@ const collectionCron = cron.schedule('0 9 * * *', async () => {
 
         const authorization_id = authResponse.data.authorization.id;
 
-        // 2. Create the Debit Transfer
         const transferResponse = await plaidClient.transferCreate({
           access_token: invoice.plaid_access_token,
           account_id: invoice.plaid_account_id,
@@ -134,7 +118,6 @@ const collectionCron = cron.schedule('0 9 * * *', async () => {
 
         const transfer_id = transferResponse.data.transfer.id;
 
-        // Update invoice
         await pool.query(`
           UPDATE invoices 
           SET 
@@ -146,7 +129,7 @@ const collectionCron = cron.schedule('0 9 * * *', async () => {
 
         console.log(`✅ Successfully collected $${amount} for invoice ${invoice.invoice_number}`);
 
-        // TODO: After successful collection, pay remaining 15% to supplier
+        // TODO: Trigger remaining 15% payout to supplier here
 
       } catch (error) {
         console.error(`❌ Failed to collect invoice ${invoice.invoice_number}:`, error.response?.data || error.message);

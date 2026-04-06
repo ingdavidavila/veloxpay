@@ -258,13 +258,13 @@ function Profile() {
               <i className="bi bi-credit-card" style={{ color: '#4CAF50', fontSize: '24px' }}></i>
               <div style={{ flex: 1 }}>
                 <label style={{ fontWeight: 'bold', fontSize: '16px' }}>
-                  Receiving Bank Account (for 85% Advances)
+                  Receiving Bank Account 
                 </label>
                 
                 {bankConnected ? (
                   <div>
                     <p style={{ color: 'green', fontWeight: 'bold', margin: '8px 0' }}>
-                      ✅ Bank account is connected and ready to receive automatic 85% advances.
+                      ✅ Bank account is connected
                     </p>
                     <button 
                       onClick={getSupplierLinkToken}
@@ -296,7 +296,7 @@ function Profile() {
                         fontSize: '15px'
                       }}
                     >
-                      Connect Bank Account for 85% Advances
+                      Connect Bank Account
                     </button>
                   </div>
                 )}
