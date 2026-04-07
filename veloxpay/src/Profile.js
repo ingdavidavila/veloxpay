@@ -11,7 +11,7 @@ function Profile() {
   const [bankConnected, setBankConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   const [linkToken, setLinkToken] = useState(null);
-  const [error, setError] = useState(null);
+  const [setError] = useState(null);
 
   const [profileData, setProfileData] = useState({
     businessName: '',
@@ -34,7 +34,6 @@ function Profile() {
         phone: user.phone || '',
       });
 
-      // Check if supplier has connected a bank account
       setBankConnected(!!user.supplier_plaid_access_token || !!user.has_bank_account);
     }
 
@@ -180,7 +179,7 @@ function Profile() {
         {/* Stats Section */}
         <div className="profile-stats">
           <div className="stat-card">
-            <div className="stat-icon" style={{ backgroundColor: '#d4edda' }}>
+            <div className="stat-icon">
               <i className="bi bi-file-earmark-text"></i>
             </div>
             <div>
@@ -190,7 +189,7 @@ function Profile() {
           </div>
 
           <div className="stat-card">
-            <div className="stat-icon" style={{ backgroundColor: '#d4edda' }}>
+            <div className="stat-icon">
               <i className="bi bi-cash"></i>
             </div>
             <div>
@@ -200,7 +199,7 @@ function Profile() {
           </div>
 
           <div className="stat-card">
-            <div className="stat-icon" style={{ backgroundColor: '#fff3cd' }}>
+            <div className="stat-icon">
               <i className="bi bi-check-circle"></i>
             </div>
             <div>
@@ -254,29 +253,21 @@ function Profile() {
             </div>
 
             {/* Improved Bank Account Section */}
-            <div className="detail-item" style={{ marginTop: '25px', padding: '18px', border: '2px solid #4CAF50', borderRadius: '10px', backgroundColor: '#f8fff8' }}>
+            <div className="detail-item authorize-ach">
               <i className="bi bi-credit-card" style={{ color: '#4CAF50', fontSize: '24px' }}></i>
               <div style={{ flex: 1 }}>
-                <label style={{ fontWeight: 'bold', fontSize: '16px' }}>
+                <label style={{ fontWeight: 'bold' }}>
                   Receiving Bank Account 
                 </label>
                 
                 {bankConnected ? (
                   <div>
-                    <p style={{ color: 'green', fontWeight: 'bold', margin: '8px 0' }}>
+                    <p style={{ color: 'green', fontWeight: 'bold'}}>
                       ✅ Bank account is connected
                     </p>
                     <button 
                       onClick={getSupplierLinkToken}
-                      style={{ 
-                        padding: '9px 18px', 
-                        backgroundColor: '#6c757d', 
-                        color: 'white', 
-                        border: 'none', 
-                        borderRadius: '5px',
-                        fontSize: '14px',
-                        cursor: 'pointer'
-                      }}
+                      className="btn-cancel" style={{ marginTop: '8px' }}
                     >
                       Change Bank Account
                     </button>
@@ -286,15 +277,7 @@ function Profile() {
                     <p style={{ margin: '8px 0' }}>No bank account connected yet.</p>
                     <button 
                       onClick={getSupplierLinkToken}
-                      style={{ 
-                        padding: '12px 20px', 
-                        backgroundColor: '#007bff', 
-                        color: 'white', 
-                        border: 'none', 
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontSize: '15px'
-                      }}
+                      className="btn-submit"
                     >
                       Connect Bank Account
                     </button>
@@ -309,16 +292,7 @@ function Profile() {
             <button 
               onClick={() => open()} 
               disabled={!ready}
-              style={{ 
-                marginTop: '12px', 
-                padding: '12px 24px', 
-                backgroundColor: '#28a745', 
-                color: 'white', 
-                border: 'none', 
-                borderRadius: '6px',
-                fontSize: '16px',
-                width: '100%'
-              }}
+              className="btn-submit"
             >
               {ready ? 'Open Secure Bank Login' : 'Loading secure connection...'}
             </button>

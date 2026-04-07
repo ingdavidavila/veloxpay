@@ -75,13 +75,7 @@ const AuthorizeACHPayment = ({ invoiceId, invoiceAmount, dueDate, onSuccess }) =
   });
 
   return (
-    <div style={{ 
-      padding: '25px', 
-      border: '2px solid #4CAF50', 
-      borderRadius: '8px',
-      backgroundColor: '#f9fff9',
-      marginTop: '30px'
-    }}>
+    <div className="authorize-ach-container">
       <h3>Step 2: Authorize Automatic ACH Debit</h3>
       <p>
         To receive your <strong>85% early payment</strong> immediately, please authorize us to 
@@ -93,7 +87,7 @@ const AuthorizeACHPayment = ({ invoiceId, invoiceAmount, dueDate, onSuccess }) =
         <button 
           onClick={getLinkToken} 
           disabled={isLoading}
-          style={{ padding: '12px 24px', fontSize: '16px' }}
+          className="btn-submit"
         >
           {isLoading ? 'Preparing secure connection...' : 'Connect Bank Account & Authorize Debit'}
         </button>
@@ -101,20 +95,13 @@ const AuthorizeACHPayment = ({ invoiceId, invoiceAmount, dueDate, onSuccess }) =
         <button 
           onClick={() => open()} 
           disabled={!ready}
-          style={{ 
-            padding: '12px 24px', 
-            fontSize: '16px', 
-            backgroundColor: '#4CAF50', 
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px'
-          }}
+          className="btn-submit"
         >
           {ready ? 'Open Bank Authorization' : 'Loading...'}
         </button>
       )}
 
-      {error && <p style={{ color: 'red', marginTop: '10px' }}>{error}</p>}
+      {error && <p className="error-message">{error}</p>}
     </div>
   );
 };

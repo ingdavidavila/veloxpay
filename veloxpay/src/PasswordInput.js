@@ -35,52 +35,26 @@ const PasswordInput = ({ onSubmit }) => {
   };
 
   return (
-    <div style={{ maxWidth: '400px', margin: '0 auto' }}>
+    <div className="password-input-container">
       <form onSubmit={handleSubmit}>
-        <div style={{ position: 'relative' }}>
+        <div className="password-field-wrapper">
           <input
             type={showPassword ? 'text' : 'password'}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Enter password"
-            style={{
-              width: '100%',
-              padding: '10px',
-              paddingRight: '50px',
-              fontSize: '16px',
-              border: '1px solid #ccc',
-              borderRadius: '4px',
-              boxSizing: 'border-box',
-            }}
+      
           />
           <button
             type="button"
             onClick={toggleShowPassword}
-            style={{
-              position: 'absolute',
-              right: '10px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '18px',
-            }}
+            className="password-toggle-btn"
           >
             {showPassword ? '🙈' : '👁️'}
           </button>
         </div>
-        <div
-          style={{
-            marginTop: '10px',
-            padding: '10px',
-            backgroundColor: '#f9f9f9',
-            border: '1px solid #ddd',
-            borderRadius: '4px',
-            fontSize: '14px',
-          }}
-        >
-          <p style={{ margin: '0 0 5px 0', fontWeight: 'bold' }}>Password Requirements:</p>
+        <div className="password-requirements">
+          <p>Password Requirements:</p>
           <ul style={{ margin: 0, paddingLeft: '20px' }}>
             <li style={{ color: validation.length ? 'green' : 'red' }}>
               {validation.length ? '✅' : '❌'} At least 8 characters
@@ -99,17 +73,7 @@ const PasswordInput = ({ onSubmit }) => {
         <button
           type="submit"
           disabled={!allValid}
-          style={{
-            width: '100%',
-            padding: '10px',
-            marginTop: '10px',
-            backgroundColor: allValid ? '#007bff' : '#ccc',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: allValid ? 'pointer' : 'not-allowed',
-            fontSize: '16px',
-          }}
+          className={`password-submit-btn ${allValid ? 'enabled' : 'disabled'}`}
         >
           Sign Up
         </button>

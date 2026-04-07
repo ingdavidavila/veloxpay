@@ -139,15 +139,7 @@ function Signup() {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                style={{
-                  position: 'absolute',
-                  right: '10px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  border: 'none',
-                  background: 'transparent',
-                  cursor: 'pointer'
-                }}
+                className="password-toggle-btn"
               >
                 {showPassword ? 'Hide' : 'Show'}
               </button>

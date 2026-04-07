@@ -1,6 +1,9 @@
+/* ====================== GLOBAL ====================== */
 body {
-  background-image: linear-gradient(to bottom, #e7f7ee, #c8e6c9);
+  background: linear-gradient(to bottom, #e7f7ee, #c8e6c9);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  margin: 0;
+  padding: 0;
 }
 
 .app-container {
@@ -10,6 +13,7 @@ body {
   align-items: center;
 }
 
+/* ====================== LANDING ====================== */
 .landing-box {
   text-align: center;
   width: 420px;
@@ -23,13 +27,12 @@ body {
   display: flex;
   align-items: center;
   gap: 14px;
-  transition: transform 0.2s ease-in-out;
+  transition: transform 0.2s ease;
 }
 
 .feature-card:hover {
   transform: scale(1.025);
 }
-
 
 .feature-icon {
   width: 42px;
@@ -70,12 +73,9 @@ body {
   border-radius: 12px;
   padding: 10px;
   font-weight: 500;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
-/* Dashboard styles */
+/* ====================== DASHBOARD ====================== */
 .dashboard-container {
   position: relative;
   min-height: 100vh;
@@ -88,7 +88,7 @@ body {
   background: #fff;
   border-right: 1px solid #eaeaea;
   padding: 20px;
-  overflow-y: auto; /* In case sidebar content overflows */
+  overflow-y: auto;
 }
 
 .sidebar .logo {
@@ -115,13 +115,9 @@ body {
   border: none;
   color: #dc3545;
   cursor: pointer;
-  font-size: inherit;
-  font-family: inherit;
-  padding: 0;
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  transition: color 0.2s ease;
 }
 
 .logout-link:hover {
@@ -132,16 +128,8 @@ body {
   flex: 1;
   padding: 20px;
   background: #f9f9f9;
-  overflow-y: auto;
-}
-
-.dashboard-content {
   margin-left: 240px;
-  display: flex;
-  flex-direction: column;
   min-height: 100vh;
-  padding-bottom: 150px; /* More space for footer */
-  background: #f9f9f9;
 }
 
 .stats-cards {
@@ -180,6 +168,11 @@ body {
   padding: 1rem;
   text-align: center;
   cursor: pointer;
+  transition: background 0.2s;
+}
+
+.action-card:hover {
+  background: #f8f9fa;
 }
 
 .recent-invoices {
@@ -201,9 +194,10 @@ body {
 
 .view-all {
   text-align: right;
+  margin-top: 1rem;
 }
 
-/* Upload Invoice Styles */
+/* ====================== UPLOAD ====================== */
 .upload-container {
   max-width: 700px;
   margin: 0 auto;
@@ -233,8 +227,8 @@ body {
   padding: 3rem 1rem;
   text-align: center;
   cursor: pointer;
-  transition: background 0.2s ease;
   background: #f9f9f9;
+  transition: all 0.2s;
 }
 
 .drop-zone:hover {
@@ -245,29 +239,7 @@ body {
 .drop-zone i {
   font-size: 2.5rem;
   color: #888;
-  display: block;
   margin-bottom: 0.5rem;
-}
-
-.drop-zone p {
-  margin: 0.5rem 0;
-  color: #333;
-}
-
-.drop-zone small {
-  color: #999;
-  display: block;
-  margin-top: 0.5rem;
-}
-
-.browse-link {
-  color: #007bff;
-  cursor: pointer;
-  text-decoration: none;
-}
-
-.browse-link:hover {
-  text-decoration: underline;
 }
 
 .file-name {
@@ -293,7 +265,6 @@ body {
   border: 1px solid #ddd;
   border-radius: 6px;
   font-size: 0.95rem;
-  font-family: inherit;
 }
 
 .form-group input:focus,
@@ -321,8 +292,6 @@ body {
   border-radius: 8px;
   background: #fff;
   cursor: pointer;
-  font-weight: 500;
-  transition: background 0.2s ease;
 }
 
 .btn-cancel:hover {
@@ -338,14 +307,18 @@ body {
   color: white;
   cursor: pointer;
   font-weight: 500;
-  transition: background 0.2s ease;
 }
 
 .btn-submit:hover {
   background: #229954;
 }
 
-/* All Invoices Styles */
+.btn-submit:disabled {
+  background: #95d5a5;
+  cursor: not-allowed;
+}
+
+/* ====================== INVOICES ====================== */
 .invoices-container {
   width: 100%;
 }
@@ -361,7 +334,6 @@ body {
   gap: 1rem;
   margin-bottom: 2rem;
   border-bottom: 1px solid #e0e0e0;
-  padding-bottom: 0;
 }
 
 .filter-tab {
@@ -372,13 +344,6 @@ body {
   font-weight: 500;
   cursor: pointer;
   border-bottom: 3px solid transparent;
-  transition: all 0.2s ease;
-  position: relative;
-  bottom: -1px;
-}
-
-.filter-tab:hover {
-  color: #666;
 }
 
 .filter-tab.active {
@@ -400,31 +365,23 @@ body {
   color: white;
 }
 
-.invoices-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
 .invoice-list-item {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
   background: white;
   border-radius: 10px;
   padding: 1.5rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-  transition: box-shadow 0.2s ease;
+  margin-bottom: 1rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
 }
 
 .invoice-list-item:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
 .invoice-left {
   display: flex;
   gap: 1rem;
-  align-items: flex-start;
   flex: 1;
 }
 
@@ -439,24 +396,12 @@ body {
   flex-shrink: 0;
 }
 
-.invoice-info h3 {
-  margin: 0 0 0.25rem 0;
-  font-size: 1.1rem;
-  font-weight: 600;
-}
-
-.invoice-info {
-  flex: 1;
-}
-
 .client-name {
-  margin: 0.25rem 0;
   color: #666;
   font-weight: 500;
 }
 
 .description {
-  margin: 0.25rem 0;
   color: #999;
   font-size: 0.9rem;
 }
@@ -465,23 +410,12 @@ body {
   display: flex;
   gap: 1.5rem;
   margin-top: 0.75rem;
-}
-
-.meta-item {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
   color: #999;
   font-size: 0.85rem;
 }
 
-.meta-item i {
-  font-size: 0.9rem;
-}
-
 .invoice-right {
   text-align: right;
-  flex-shrink: 0;
 }
 
 .badge {
@@ -493,31 +427,18 @@ body {
   margin-bottom: 0.75rem;
 }
 
-.badge-pending {
-  background: #fff3cd;
-  color: #856404;
-}
-
-.badge-approved {
-  background: #d4edda;
-  color: #155724;
-}
-
-.badge-paid {
-  background: #cfe2ff;
-  color: #084298;
-}
+.badge-pending { background: #fff3cd; color: #856404; }
+.badge-approved { background: #d4edda; color: #155724; }
+.badge-paid { background: #cfe2ff; color: #084298; }
 
 .invoice-amount {
   font-size: 1.5rem;
   font-weight: 700;
-  margin-bottom: 0.25rem;
 }
 
 .early-payout {
   color: #27ae60;
   font-size: 0.85rem;
-  margin-bottom: 0.25rem;
 }
 
 .due-date {
@@ -525,17 +446,10 @@ body {
   font-size: 0.85rem;
 }
 
-/* Profile Styles */
+/* ====================== PROFILE ====================== */
 .profile-container {
-  width: 100%;
   max-width: 700px;
   margin: 0 auto;
-}
-
-.profile-subtitle {
-  color: #6c757d;
-  margin-bottom: 2rem;
-  font-size: 0.95rem;
 }
 
 .profile-stats {
@@ -552,7 +466,6 @@ body {
   display: flex;
   align-items: center;
   gap: 1rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .stat-icon {
@@ -564,27 +477,14 @@ body {
   justify-content: center;
   font-size: 1.5rem;
   color: #27ae60;
-  flex-shrink: 0;
 }
 
-.stat-label {
-  margin: 0;
-  color: #999;
-  font-size: 0.9rem;
-}
-
-.stat-value {
-  margin: 0.5rem 0 0 0;
-  font-size: 1.5rem;
-  font-weight: 700;
-}
-
-.account-section {
+.account-section,
+.settings-section {
   background: white;
   border-radius: 10px;
   padding: 1.5rem;
   margin-bottom: 2rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .account-header {
@@ -592,14 +492,8 @@ body {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 1.5rem;
-  padding-bottom: 1.5rem;
   border-bottom: 1px solid #eaeaea;
-}
-
-.account-info {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
+  padding-bottom: 1.5rem;
 }
 
 .account-icon {
@@ -607,44 +501,11 @@ body {
   height: 50px;
   border-radius: 10px;
   background: #27ae60;
+  color: white;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 1.5rem;
-  color: white;
-}
-
-.account-info h3 {
-  margin: 0;
-  font-size: 1.1rem;
-}
-
-.account-info p {
-  margin: 0.5rem 0 0 0;
-  color: #999;
-  font-size: 0.9rem;
-}
-
-.edit-btn {
-  background: none;
-  border: none;
-  color: #007bff;
-  cursor: pointer;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  transition: color 0.2s ease;
-}
-
-.edit-btn:hover {
-  color: #0056b3;
-}
-
-.account-details {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
 }
 
 .detail-item {
@@ -657,7 +518,6 @@ body {
   font-size: 1.2rem;
   color: #999;
   margin-top: 0.25rem;
-  flex-shrink: 0;
 }
 
 .detail-item label {
@@ -665,19 +525,6 @@ body {
   color: #999;
   font-size: 0.85rem;
   margin-bottom: 0.25rem;
-}
-
-.detail-item p {
-  margin: 0;
-  font-weight: 500;
-}
-
-.detail-item input {
-  width: 100%;
-  padding: 0.5rem;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 0.95rem;
 }
 
 .edit-actions {
@@ -695,13 +542,6 @@ body {
   color: white;
   border: none;
   border-radius: 8px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: background 0.2s ease;
-}
-
-.btn-save:hover {
-  background: #229954;
 }
 
 .btn-cancel {
@@ -711,29 +551,12 @@ body {
   color: #666;
   border: none;
   border-radius: 8px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: background 0.2s ease;
-}
-
-.btn-cancel:hover {
-  background: #eeeeee;
-}
-
-.settings-section {
-  margin-bottom: 2rem;
-}
-
-.settings-section h2 {
-  margin-bottom: 1rem;
-  font-size: 1.1rem;
 }
 
 .settings-list {
   background: white;
   border-radius: 10px;
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .setting-item {
@@ -743,26 +566,10 @@ body {
   padding: 1.25rem 1.5rem;
   border-bottom: 1px solid #eaeaea;
   cursor: pointer;
-  transition: background 0.2s ease;
-}
-
-.setting-item:last-child {
-  border-bottom: none;
 }
 
 .setting-item:hover {
   background: #f9f9f9;
-}
-
-.setting-content {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.setting-content i {
-  font-size: 1.2rem;
-  color: #666;
 }
 
 .logout-btn {
@@ -773,27 +580,61 @@ body {
   color: #dc3545;
   border-radius: 8px;
   cursor: pointer;
-  font-weight: 500;
-  font-size: 1rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  transition: all 0.2s ease;
 }
 
-.logout-btn:hover {
-  background: #dc3545;
+/* ====================== AUTHORIZE ACH ====================== */
+.authorize-ach {
+  background: #f9fff9;
+  border: 2px solid #4CAF50;
+  border-radius: 10px;
+  padding: 20px;
+  margin-top: 20px;
+}
+
+.authorize-ach h4 {
+  margin: 0 0 12px 0;
+  color: #27ae60;
+}
+
+.ach-description {
+  margin-bottom: 18px;
+  color: #555;
+}
+
+.error-message {
+  color: #dc3545;
+  margin-top: 10px;
+}
+
+/* ====================== TOASTS ====================== */
+.toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 16px 24px;
+  border-radius: 8px;
   color: white;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  animation: slideIn 0.3s ease;
 }
 
-/* Footer Styles */
+.toast-info { background-color: #17a2b8; }
+.toast-success { background-color: #28a745; }
+.toast-error { background-color: #dc3545; }
+
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+/* ====================== FOOTER ====================== */
 .dashboard-footer {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 2rem 20px 1rem;
+  padding: 2rem 20px 1.5rem;
   border-top: 1px solid #eaeaea;
   text-align: center;
   color: #999;
@@ -824,53 +665,124 @@ body {
   font-weight: 500;
   color: #333;
 }
+/* ====================== PASSWORD INPUT ====================== */
+.password-input-container {
+  max-width: 400px;
+  margin: 0 auto;
+  padding: 20px;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
 
-.password-toast {
-  margin-top: 10px;
+.password-input-container form {
+  width: 100%;
+}
+
+.password-field-wrapper {
+  position: relative;
+  margin-bottom: 15px;
+}
+
+.password-field-wrapper input {
+  width: 100%;
+  padding: 12px 50px 12px 12px;
+  font-size: 16px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  box-sizing: border-box;
+}
+
+.password-field-wrapper input:focus {
+  outline: none;
+  border-color: #27ae60;
+  box-shadow: 0 0 0 3px rgba(39, 174, 96, 0.1);
+}
+
+.password-toggle-btn {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.password-requirements {
+  background: #f9f9f9;
+  border: 1px solid #ddd;
+  border-radius: 6px;
   padding: 12px;
-  border-radius: 8px;
-  background: #ffffff;
-  border: 1px solid #dcdcdc;
-  font-size: 0.9rem;
-  box-shadow: 0px 4px 12px rgba(0,0,0,0.08);
-  animation: fadeIn 0.2s ease-in-out;
+  margin-bottom: 15px;
+  font-size: 14px;
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.password-requirements p {
+  margin: 0 0 8px 0;
+  font-weight: 600;
+  color: #333;
 }
-.toast {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  padding: 16px 24px;
+
+.password-requirements ul {
+  margin: 0;
+  padding-left: 20px;
+  list-style: none;
+}
+
+.password-requirements li {
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.password-requirements .valid {
+  color: #27ae60;
+}
+
+.password-requirements .invalid {
+  color: #dc3545;
+}
+
+/* Reuse your existing button style */
+.password-submit-btn {
+  width: 100%;
+  padding: 12px;
+  margin-top: 10px;
+  border: none;
   border-radius: 8px;
+  font-weight: 500;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.password-submit-btn.enabled {
+  background: #27ae60;
   color: white;
-  z-index: 1000;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  animation: slideIn 0.3s ease;
 }
 
-.toast-info {
-  background-color: #17a2b8;
+.password-submit-btn.enabled:hover {
+  background: #229954;
 }
 
-.toast-success {
-  background-color: #28a745;
+.password-submit-btn.disabled {
+  background: #ccc;
+  color: #666;
+  cursor: not-allowed;
 }
 
-.toast-error {
-  background-color: #dc3545;
-}
-
-@keyframes slideIn {
-  from { transform: translateX(100%); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+.password-toggle-btn {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px;
 }
