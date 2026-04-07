@@ -1,68 +1,97 @@
-# Node.js dependencies
+# ========================================
+# Node.js / NPM / Yarn
+# ========================================
 node_modules/
 veloxpay/node_modules/
 server/node_modules/
 
-# Environment variables (security)
-.env
-.env.local
-.env.development
-.env.production
-server/.env
-veloxpay/.env
-
-# Build outputs
-veloxpay/build/
-veloxpay/dist/
-
-# Uploaded files (invoices, documents, etc.)
-server/uploads/
-server/uploads/**
-
-# Logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-server/logs/
-
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
-
-# Coverage
-coverage/
-.nyc_output/
-
-# OS generated files
-.DS_Store
-Thumbs.db
-
-# IDE / Editor
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# Temporary files
-temp/
-tmp/
-
-# Yarn
+# Yarn specific
+.yarn/
+.pnp.*
 .yarn-integrity
 .yarn/cache
 .yarn/unplugged
 .yarn/build-state.yml
 .yarn/install-state.gz
-.pnp.*
 
-# Optional npm cache
+# NPM cache
 .npm
 
-# macOS
-.DS_Store
+# ========================================
+# Environment Variables (Security Critical)
+# ========================================
+.env
+.env.local
+.env.development
+.env.production
+.env*.local
+server/.env
+veloxpay/.env
 
-# Windows
+# ========================================
+# Build & Dist folders
+# ========================================
+veloxpay/build/
+veloxpay/dist/
+dist/
+build/
+
+# ========================================
+# Uploaded Files (Invoices, Documents)
+# ========================================
+# We usually DO NOT want to commit user-uploaded files
+server/uploads/
+server/uploads/**
+
+# ========================================
+# Logs & Runtime data
+# ========================================
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+server/logs/
+logs/
+
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# ========================================
+# Coverage & Testing
+# ========================================
+coverage/
+.nyc_output/
+
+# ========================================
+# OS generated files
+# ========================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+
+# ========================================
+# IDE / Editor files
+# ========================================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ========================================
+# Temporary files
+# ========================================
+temp/
+tmp/
+*.tmp
+
+# ========================================
+# Optional: Database files (if you ever use SQLite)
+# ========================================
+*.sqlite
+*.db
