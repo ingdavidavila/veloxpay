@@ -90,8 +90,8 @@ function Signup() {
   };
 
   return (
-    <div className="app-container">
-      <div className="landing-box">
+    <div className="premium-signup-page">
+      <div className="premium-signup-box">
         <h1>Create an Account</h1>
 
         {error && <div className="alert alert-danger">{error}</div>}
@@ -168,7 +168,7 @@ function Signup() {
 
           <button
             type="submit"
-            className="btn btn-success primary-button"
+            className="btn-gold btn-large w-100"
             disabled={!passwordValid}
           >
             Sign Up
@@ -177,11 +177,11 @@ function Signup() {
         </form>
 
         <p className="mt-3">
-          <Link to="/login">Already have an account? Log in</Link>
+          <Link to="/login" className="back-home">Already have an account? Log in</Link>
         </p>
 
         <p className="mt-3">
-          <Link to="/">Home</Link>
+          <Link to="/" className="back-home">Home</Link>
         </p>
 
       </div>

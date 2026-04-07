@@ -48,14 +48,14 @@ function ForgotPassword() {
   };
 
   return (
-    <div className="app-container">
-      <div className="landing-box">
-        <h1>Reset Your Password</h1>
+    <div className="premium-auth-page">
+      <div className="premium-auth-box">
+        <h1 style={{ color: 'white' }}>Reset Your Password</h1>
         {error && <div className="alert alert-danger">{error}</div>}
         {success && <div className="alert alert-success">{success}</div>}
         
         <form onSubmit={handleSubmit}>
-          <p className="mb-3">
+          <p className="auth-header" style={{ color: 'white' }}>
             Enter your email address and we'll send you a link to reset your password.
           </p>
           <div className="mb-3">
@@ -72,7 +72,7 @@ function ForgotPassword() {
           </div>
           <button 
             type="submit" 
-            className="btn btn-success primary-button"
+            className="btn-gold btn-large w-100"
             disabled={loading}
           >
             {loading ? 'Sending...' : 'Send Reset Link'}
@@ -80,7 +80,7 @@ function ForgotPassword() {
         </form>
 
         <p className="mt-3">
-          <Link to="/login">Back to Login</Link>
+          <Link to="/login" className="back-home">Back to Login</Link>
         </p>
       </div>
     </div>

@@ -13,68 +13,6 @@ body {
   align-items: center;
 }
 
-/* ====================== LANDING ====================== */
-.landing-box {
-  text-align: center;
-  width: 420px;
-}
-
-.feature-card {
-  background: white;
-  border-radius: 14px;
-  padding: 18px;
-  margin-top: 16px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  transition: transform 0.2s ease;
-}
-
-.feature-card:hover {
-  transform: scale(1.025);
-}
-
-.feature-icon {
-  width: 42px;
-  height: 42px;
-  background: #e7f7ee;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.feature-text {
-  text-align: left;
-}
-
-.primary-button {
-  margin-top: 28px;
-  width: 100%;
-  border-radius: 12px;
-  padding: 12px;
-  font-weight: 600;
-}
-
-.login-text {
-  margin-top: 14px;
-  color: #6c757d;
-}
-
-.social-login {
-  margin-top: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.auth-button {
-  width: 100%;
-  border-radius: 12px;
-  padding: 10px;
-  font-weight: 500;
-}
-
 /* ====================== DASHBOARD ====================== */
 .dashboard-container {
   position: relative;
@@ -630,59 +568,6 @@ body {
 
 /* ====================== FOOTER ====================== */
 .dashboard-footer {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 2rem 20px 1.5rem;
-  border-top: 1px solid #eaeaea;
-  background: #f9f9f9;
-  z-index: 10;
-  text-align: center;
-  color: #999;
-  font-size: 0.9rem;
-}
-
-/* Make sure main content has enough bottom padding so footer doesn't overlap */
-.dashboard-main {
-  padding-bottom: 120px;   /* This is the key fix */
-  min-height: calc(100vh - 240px); /* Prevents footer overlap on short pages */
-}
-
-.dashboard-container {
-  position: relative;
-  min-height: 100vh;
-}
-
-/* Footer links */
-.footer-links {
-  display: flex;
-  justify-content: center;
-  gap: 2rem;
-  margin-bottom: 1rem;
-  flex-wrap: wrap;
-}
-
-.footer-link {
-  color: #666;
-  text-decoration: none;
-  font-size: 0.9rem;
-  transition: color 0.2s ease;
-}
-
-.footer-link:hover {
-  color: #27ae60;
-}
-
-.footer-company {
-  font-weight: 500;
-  color: #333;
-  margin-top: 8px;
-}
-
-
-/* ====================== FOOTER ====================== */
-.dashboard-footer {
   position: relative;         /* Changed from absolute */
   margin-top: auto;           /* Pushes it to bottom when using flex */
   padding: 2rem 40px 1.5rem;  /* More left padding to account for sidebar */
@@ -1106,4 +991,230 @@ body {
   font-size: 1.2rem;
   color: #bbb;
   margin-bottom: 2rem;
+}
+
+/* ====================== PREMIUM AUTH PAGES (Login / Signup) ====================== */
+.premium-auth-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a3c2e 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
+
+.premium-auth-box {
+  background: #111;
+  border: 1px solid #222;
+  border-radius: 16px;
+  padding: 50px 45px;
+  max-width: 440px;
+  width: 100%;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+}
+
+.auth-header {
+  text-align: center;
+  margin-bottom: 2.2rem;
+}
+
+.auth-header h1 {
+  color: white;
+  font-size: 2.5rem;
+  margin-bottom: 0.6rem;
+}
+
+.auth-header p {
+  color: #bbb;
+  font-size: 1.1rem;
+}
+
+.form-group {
+  margin-bottom: 1.8rem;
+}
+
+.form-label {
+  color: #ddd;
+  margin-bottom: 10px;
+  display: block;
+  font-weight: 500;
+}
+
+.premium-input {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  color: #f0f0f0;
+  padding: 14px 18px;
+  border-radius: 10px;
+  font-size: 1.05rem;
+}
+
+.premium-input:focus {
+  border-color: #d4af37;
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.2);
+  outline: none;
+}
+
+.btn-gold {
+  background: #d4af37;
+  color: #0a0a0a;
+  font-weight: 600;
+  padding: 15px;
+  border-radius: 10px;
+  font-size: 1.1rem;
+}
+
+.btn-gold:hover {
+  background: #e5c158;
+}
+
+.divider {
+  text-align: center;
+  color: #666;
+  padding-top: 10px;
+  position: relative;
+}
+
+.auth-link, .forgot-link, .back-home {
+  color: #27ae60;
+  text-decoration: none;
+}
+
+.auth-link:hover, .forgot-link:hover {
+  text-decoration: underline;
+}
+
+.auth-footer-text {
+  color: #bbb;
+}
+
+.social-login {
+  margin-top: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.social-btn {
+  width: 100%;
+  padding: 16px 20px;
+  border-radius: 10px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  border: 2px solid #555;
+  background: #1f1f1f;
+  color: #ffffff;           /* Bright white text - now clearly visible */
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.social-btn:hover {
+  background: #2a2a2a;
+  border-color: #d4af37;    /* Gold border on hover */
+  color: #d4af37;           /* Gold text on hover */
+  transform: translateY(-3px);
+  box-shadow: 0 4px 15px rgba(212, 175, 55, 0.25);
+}
+/* ====================== PREMIUM SIGNUP - MATCHING HOME STYLE ====================== */
+
+.premium-signup-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a3c2e 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
+
+.premium-signup-box {
+  background: #111;
+  border: 1px solid #222;
+  border-radius: 16px;
+  padding: 50px 45px;
+  max-width: 440px;
+  width: 100%;
+  box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+}
+
+.premium-signup-box h1 {
+  color: white;
+  text-align: center;
+  margin-bottom: 0.5rem;
+}
+
+.premium-signup-box p {
+  color: #bbb;
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.form-group {
+  margin-bottom: 1.8rem;
+}
+
+.form-label {
+  color: #ddd;
+  margin-bottom: 10px;
+  display: block;
+  font-weight: 500;
+}
+
+.form-control {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  color: #f0f0f0;
+  padding: 14px 18px;
+  border-radius: 10px;
+  font-size: 1.05rem;
+}
+
+.form-control:focus {
+  border-color: #d4af37;
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.2);
+}
+
+.password-toggle-btn {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #999;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.password-toast {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 10px;
+  padding: 16px;
+  margin-top: 12px;
+  color: #ddd;
+}
+
+.btn-gold {
+  background: #d4af37;
+  color: #0a0a0a;
+  font-weight: 600;
+  padding: 15px;
+  border-radius: 10px;
+  width: 100%;
+  font-size: 1.1rem;
+  margin-top: 10px;
+}
+
+.btn-gold:hover {
+  background: #e5c158;
+}
+
+.btn-gold:disabled {
+  background: #555;
+  color: #999;
+  cursor: not-allowed;
 }

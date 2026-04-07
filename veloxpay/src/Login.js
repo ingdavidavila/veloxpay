@@ -16,25 +16,20 @@ function Login() {
   // Handle redirect from Apple/other OAuth providers
   useEffect(() => {
     const token = searchParams.get('token');
-    const error = searchParams.get('error');
+    const errorParam = searchParams.get('error');
 
     if (token) {
-      // Try to decode JWT to get user info (basic decode, not verification)
       try {
         const payload = JSON.parse(atob(token.split('.')[1]));
-        const userData = {
-          userId: payload.userId,
-          // Add more user data if available
-        };
+        const userData = { userId: payload.userId };
         login(token, userData);
         navigate('/dashboard');
       } catch (err) {
         console.error('Error decoding token:', err);
-        // Still set token even if decode fails
         login(token, {});
         navigate('/dashboard');
       }
-    } else if (error) {
+    } else if (errorParam) {
       setError('Authentication failed. Please try again.');
     }
   }, [searchParams, navigate, login]);
@@ -46,9 +41,7 @@ function Login() {
     try {
       const response = await fetch('http://localhost:5000/api/login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
 
@@ -72,12 +65,8 @@ function Login() {
       try {
         const response = await fetch('http://localhost:5000/api/google', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            credential: tokenResponse.credential,
-          }),
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ credential: tokenResponse.credential }),
         });
 
         if (!response.ok) {
@@ -94,65 +83,86 @@ function Login() {
         setError('Google login failed');
       }
     },
-    onError: () => {
-      setError('Google login failed');
-    },
+    onError: () => setError('Google login failed'),
   });
 
   const handleAppleLogin = () => {
-    // Redirect to backend Apple auth endpoint
-    window.open(
-    "http://localhost:5000/auth/apple",
-    "Apple Login",
-    "width=500,height=700"
-);
+    window.open("http://localhost:5000/auth/apple", "Apple Login", "width=500,height=700");
   };
 
   return (
-    <div className="app-container">
-      <div className="landing-box">
-        <h1>Login to Velox Pay</h1>
+    <div className="premium-auth-page">
+      <div className="premium-auth-box">
+        <div className="auth-header">
+          <h1>Welcome Back to VeloxPay</h1>
+          <p>Sign in to manage your invoices and funding</p>
+        </div>
+
         {error && <div className="alert alert-danger">{error}</div>}
+
         <form onSubmit={handleSubmit}>
-          <div className="mb-3">
-            <label htmlFor="email" className="form-label">Email</label>
+          <div className="form-group">
+            <label htmlFor="email" className="form-label">Email Address</label>
             <input
               type="email"
-              className="form-control"
+              className="form-control premium-input"
               id="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
             />
           </div>
-          <div className="mb-3">
+
+          <div className="form-group">
             <label htmlFor="password" className="form-label">Password</label>
             <input
               type="password"
-              className="form-control"
+              className="form-control premium-input"
               id="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
             />
           </div>
-          <button type="submit" className="btn btn-success primary-button">Login</button>
-          <div className="text-center mt-2">
+
+          <button type="submit" className="btn-gold btn-large w-100">
+            Sign In
+          </button>
+
+          <div className="text-center mt-3">
             <small>
-              <Link to="/forgot-password" style={{ fontSize: '0.9rem' }}>Forgot Password?</Link>
+              <Link to="/forgot-password" className="forgot-link">Forgot Password?</Link>
             </small>
           </div>
-          <div className="social-login">
-            <button type="button" className="btn btn-light auth-button" onClick={() => googleLogin()}>
-              Continue with Google
-            </button>
-            <button type="button" className="btn btn-light auth-button" onClick={handleAppleLogin}>
-              Continue with Apple
-            </button>
-          </div>
         </form>
-        <p className="mt-3">
-          <Link to="/">Back to Home</Link>
+
+        <div className="divider">
+          <span>or continue with</span>
+        </div>
+
+        <div className="social-login">
+          <button 
+            type="button" 
+            className="auth-button social-btn" 
+            onClick={() => googleLogin()}
+          >
+            Continue with Google
+          </button>
+          <button 
+            type="button" 
+            className="auth-button social-btn" 
+            onClick={handleAppleLogin}
+          >
+            Continue with Apple
+          </button>
+        </div>
+
+        <p className="mt-4 text-center auth-footer-text">
+          Don't have an account? <Link to="/signup" className="auth-link">Create one here</Link>
+        </p>
+
+        <p className="text-center mt-3">
+          <Link to="/" className="back-home">← Back to Home</Link>
         </p>
       </div>
     </div>
