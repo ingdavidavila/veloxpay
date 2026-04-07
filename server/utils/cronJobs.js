@@ -55,9 +55,9 @@ const reminderCron = cron.schedule('0 8 * * *', async () => {
   timezone: "America/Mexico_City"
 });
 
-// ====================== ACH COLLECTION JOB ======================
+// ====================== ACH COLLECTION + 15% FINAL PAYOUT ======================
 const collectionCron = cron.schedule('0 9 * * *', async () => {
-  console.log('🔄 Starting Daily ACH Collection Job...');
+  console.log('💰 Starting Daily ACH Collection + Final Payout Job...');
 
   try {
     const query = `
@@ -65,79 +65,100 @@ const collectionCron = cron.schedule('0 9 * * *', async () => {
         i.id,
         i.invoice_number,
         i.total_amount,
+        i.advance_amount,
+        i.term_days,
+        i.fee_percentage,
         i.plaid_access_token,
         i.plaid_account_id,
-        c.name AS client_name,
-        c.email AS client_email
+        i.supplier_plaid_access_token,
+        i.supplier_plaid_account_id,
+        i.supplier_id
       FROM invoices i
-      JOIN customers c ON c.id = i.customer_id
-      WHERE i.ach_authorized = true
-        AND i.plaid_access_token IS NOT NULL
-        AND i.plaid_account_id IS NOT NULL
-        AND i.due_date = CURRENT_DATE
-        AND i.collected_amount IS NULL
-        AND i.status NOT IN ('paid', 'cancelled', 'rejected');
+      WHERE i.status = 'paid'                    -- Only process recently collected invoices
+        AND i.collected_amount IS NOT NULL
+        AND i.final_payout_sent IS NOT TRUE        -- Not yet paid the remaining 15%
+        AND i.supplier_plaid_access_token IS NOT NULL
+        AND i.supplier_plaid_account_id IS NOT NULL;
     `;
 
     const { rows: invoices } = await pool.query(query);
 
     if (invoices.length === 0) {
-      console.log('✅ No invoices to collect today.');
+      console.log('✅ No invoices ready for final 15% payout today.');
       return;
     }
 
-    console.log(`📥 Found ${invoices.length} invoice(s) for ACH collection.`);
+    console.log(`📤 Found ${invoices.length} invoice(s) for final 15% payout.`);
 
     for (const invoice of invoices) {
-      const amount = Number(invoice.total_amount).toFixed(2);
-
       try {
-        const authResponse = await plaidClient.transferAuthorizationCreate({
-          access_token: invoice.plaid_access_token,
-          account_id: invoice.plaid_account_id,
-          type: 'debit',
+        // Calculate fee based on term_days (your exact structure)
+        let feePercentage = 5.0;
+        if (invoice.term_days >= 60) feePercentage = 7.5;
+        if (invoice.term_days >= 90) feePercentage = 10.0;
+
+        const total = parseFloat(invoice.total_amount);
+        const advance = parseFloat(invoice.advance_amount || 0);
+        const fee = total * (feePercentage / 100);
+        const remaining = total - advance;
+        const supplierPayout = Math.round((remaining - fee) * 100) / 100;
+
+        if (supplierPayout <= 0) {
+          console.warn(`⚠️ Supplier payout is zero or negative for invoice ${invoice.invoice_number}`);
+          continue;
+        }
+
+        console.log(`Calculating final payout for invoice ${invoice.invoice_number}:`);
+        console.log(`  Total: $${total} | Advance: $${advance} | Fee (${feePercentage}%): $${fee} | Payout: $${supplierPayout}`);
+
+        // Send final payout via Plaid ACH Credit to supplier
+        const supplierAuthResponse = await plaidClient.transferAuthorizationCreate({
+          access_token: invoice.supplier_plaid_access_token,
+          account_id: invoice.supplier_plaid_account_id,
+          type: 'credit',
           network: 'ach',
-          amount: amount,
-          ach_class: 'web',
-          user: { legal_name: invoice.client_name },
-          idempotency_key: `auth_${invoice.id}_${Date.now()}`,
+          amount: supplierPayout.toFixed(2),
+          description: `VeloxPay - Final payout for Invoice ${invoice.invoice_number}`,
         });
 
-        const authorization_id = authResponse.data.authorization.id;
+        const supplierAuthorizationId = supplierAuthResponse.data.authorization.id;
 
-        const transferResponse = await plaidClient.transferCreate({
-          access_token: invoice.plaid_access_token,
-          account_id: invoice.plaid_account_id,
-          authorization_id,
-          type: 'debit',
+        const supplierTransferResponse = await plaidClient.transferCreate({
+          access_token: invoice.supplier_plaid_access_token,
+          account_id: invoice.supplier_plaid_account_id,
+          authorization_id: supplierAuthorizationId,
+          type: 'credit',
           network: 'ach',
-          amount: amount,
-          description: `VeloxPay - Invoice ${invoice.invoice_number}`,
-          idempotency_key: `debit_${invoice.id}`,
+          amount: supplierPayout.toFixed(2),
+          description: `VeloxPay - Final payout for Invoice ${invoice.invoice_number}`,
+          idempotency_key: `final_payout_${invoice.id}`,
         });
 
-        const transfer_id = transferResponse.data.transfer.id;
+        const supplierTransferId = supplierTransferResponse.data.transfer.id;
 
+        // Update invoice
         await pool.query(`
           UPDATE invoices 
           SET 
-            collected_amount = $1,
-            collection_transfer_id = $2,
-            collected_at = NOW()
-          WHERE id = $3
-        `, [invoice.total_amount, transfer_id, invoice.id]);
+            final_payout_amount = $1,
+            final_payout_transfer_id = $2,
+            final_payout_sent = TRUE,
+            final_payout_at = NOW(),
+            fee_percentage = $3
+          WHERE id = $4
+        `, [supplierPayout, supplierTransferId, feePercentage, invoice.id]);
 
-        console.log(`✅ Successfully collected $${amount} for invoice ${invoice.invoice_number}`);
-
-        // TODO: Trigger remaining 15% payout to supplier here
+        console.log(`✅ Sent final payout of $${supplierPayout} to supplier for invoice ${invoice.invoice_number}`);
 
       } catch (error) {
-        console.error(`❌ Failed to collect invoice ${invoice.invoice_number}:`, error.response?.data || error.message);
+        console.error(`❌ Failed to send final payout for invoice ${invoice.invoice_number}:`, error.response?.data || error.message);
       }
     }
 
+    console.log('✅ Daily collection + final payout job completed.');
+
   } catch (error) {
-    console.error('❌ Error in ACH collection cron job:', error);
+    console.error('❌ Error in ACH collection + final payout cron job:', error);
   }
 }, {
   timezone: "America/Mexico_City"

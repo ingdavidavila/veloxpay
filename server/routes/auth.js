@@ -7,7 +7,7 @@ const crypto = require("crypto");
 const pool = require("../db");
 
 const passwordValidator = require("../middleware/passwordValidator");
-const authenticateToken = require('../middleware/auth.js'); // Adjusted path to match your project structure
+const authenticateToken = require('../middleware/auth.js');
 
 // Import mail service
 const { 
@@ -28,7 +28,7 @@ const handleSignup = async (req, res) => {
 
     const saltRounds = 10;
     const password_hash = await bcrypt.hash(password, saltRounds);
-    const id = uuidv4();
+    const userId = uuidv4();
 
     const query = `
       INSERT INTO users (id, name, business_name, email, phone_number, bank_account, password_hash)
@@ -36,10 +36,22 @@ const handleSignup = async (req, res) => {
       RETURNING id, name, email, business_name, created_at
     `;
 
-    const result = await pool.query(query, [id, name, business_name, email, phone_number, bank_account, password_hash]);
+    const result = await pool.query(query, [userId, name, business_name, email, phone_number, bank_account, password_hash]);
+
+    const newUser = result.rows[0];
+
+    // Create supplier record and link it
+    const supplierId = uuidv4();
+    await pool.query(`
+      INSERT INTO suppliers (id, user_id, name, business_name, email, created_at)
+      VALUES ($1, $2, $3, $4, $5, NOW())
+    `, [supplierId, newUser.id, newUser.name, newUser.business_name || newUser.name, newUser.email]);
 
     const token = jwt.sign(
-      { userId: result.rows[0].id },
+      { 
+        userId: newUser.id,
+        supplierId: supplierId 
+      },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
@@ -47,7 +59,7 @@ const handleSignup = async (req, res) => {
     res.status(201).json({
       message: "User created successfully",
       token,
-      user: result.rows[0]
+      user: newUser
     });
   } catch (error) {
     console.error("Signup error:", error);
@@ -100,8 +112,31 @@ const handleLogin = async (req, res) => {
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
+    // === Find or create supplier link ===
+    let supplierId;
+
+    const supplierCheck = await pool.query(
+      "SELECT id FROM suppliers WHERE user_id = $1 LIMIT 1", 
+      [user.id]
+    );
+
+    if (supplierCheck.rows.length === 0) {
+      // Create a supplier record linked to this user
+      supplierId = uuidv4();
+      await pool.query(`
+        INSERT INTO suppliers (id, user_id, name, business_name, email, created_at)
+        VALUES ($1, $2, $3, $4, $5, NOW())
+      `, [supplierId, user.id, user.name, user.business_name || user.name, user.email]);
+    } else {
+      supplierId = supplierCheck.rows[0].id;
+    }
+
+    // Create JWT with both userId and supplierId
     const token = jwt.sign(
-      { userId: user.id },
+      { 
+        userId: user.id,
+        supplierId: supplierId 
+      },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
@@ -113,7 +148,8 @@ const handleLogin = async (req, res) => {
         id: user.id,
         name: user.name,
         email: user.email,
-        business_name: user.business_name
+        business_name: user.business_name,
+        supplierId: supplierId   // Important for frontend
       }
     });
   } catch (error) {
@@ -145,7 +181,7 @@ router.post("/auth/forgot-password", async (req, res) => {
     const userId = userResult.rows[0].id;
     const resetToken = crypto.randomBytes(32).toString('hex');
     const resetTokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
-    const tokenExpiry = new Date(Date.now() + 3600000); // 1 hour
+    const tokenExpiry = new Date(Date.now() + 3600000);
 
     await pool.query(
       "UPDATE users SET reset_token = $1, reset_token_expiry = $2 WHERE id = $3",
@@ -231,7 +267,7 @@ router.post("/reset-password", async (req, res) => {
 });
 
 // ======================
-// SOCIAL LOGIN ROUTES (Google + Apple)
+// SOCIAL LOGIN ROUTES
 // ======================
 
 // Google Login
@@ -248,15 +284,34 @@ router.post("/google", async (req, res) => {
     const result = await findOrCreateSocialUser({
       provider: 'google',
       credential: credential,
-      // You can pass more data if needed from Google token
     });
 
     if (!result.success) {
       return res.status(400).json({ error: result.error || "Google login failed" });
     }
 
+    // Link or create supplier
+    let supplierId;
+    const supplierCheck = await pool.query(
+      "SELECT id FROM suppliers WHERE user_id = $1 LIMIT 1", 
+      [result.user.id]
+    );
+
+    if (supplierCheck.rows.length === 0) {
+      supplierId = uuidv4();
+      await pool.query(`
+        INSERT INTO suppliers (id, user_id, name, business_name, email, created_at)
+        VALUES ($1, $2, $3, $4, $5, NOW())
+      `, [supplierId, result.user.id, result.user.name, result.user.business_name || result.user.name, result.user.email]);
+    } else {
+      supplierId = supplierCheck.rows[0].id;
+    }
+
     const token = jwt.sign(
-      { userId: result.user.id },
+      { 
+        userId: result.user.id,
+        supplierId: supplierId 
+      },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
@@ -277,10 +332,10 @@ router.post("/google", async (req, res) => {
   }
 });
 
-// Apple Login (using your existing appleAuth utility)
+// Apple Login
 router.post("/auth/apple", async (req, res) => {
   try {
-    const { identityToken, user } = req.body;   // Apple sends identityToken
+    const { identityToken, user: appleUser } = req.body;
 
     if (!identityToken) {
       return res.status(400).json({ error: "Apple identity token is required" });
@@ -288,14 +343,34 @@ router.post("/auth/apple", async (req, res) => {
 
     const { handleAppleLogin } = require("../utils/appleAuth");
 
-    const result = await handleAppleLogin(identityToken, user);
+    const result = await handleAppleLogin(identityToken, appleUser);
 
     if (!result.success) {
       return res.status(400).json({ error: result.error || "Apple login failed" });
     }
 
+    // Link or create supplier
+    let supplierId;
+    const supplierCheck = await pool.query(
+      "SELECT id FROM suppliers WHERE user_id = $1 LIMIT 1", 
+      [result.user.id]
+    );
+
+    if (supplierCheck.rows.length === 0) {
+      supplierId = uuidv4();
+      await pool.query(`
+        INSERT INTO suppliers (id, user_id, name, business_name, email, created_at)
+        VALUES ($1, $2, $3, $4, $5, NOW())
+      `, [supplierId, result.user.id, result.user.name, result.user.business_name || result.user.name, result.user.email]);
+    } else {
+      supplierId = supplierCheck.rows[0].id;
+    }
+
     const token = jwt.sign(
-      { userId: result.user.id },
+      { 
+        userId: result.user.id,
+        supplierId: supplierId 
+      },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );

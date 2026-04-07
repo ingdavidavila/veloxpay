@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from './useAuth';
 
 function Upload() {
+  const { token } = useAuth();
+
   const [file, setFile] = useState(null);
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -11,18 +14,46 @@ function Upload() {
     invoiceNumber: '',
     amount: '',
     dueDate: '',
-    client: '',
+    clientId: '',
     description: '',
     termDays: '30'
   });
 
-  // Load clients (replace this with real API call later if you have one)
+  // Fetch clients
   useEffect(() => {
-    setClients([
-      { id: 'client1', name: 'Acme Corp' },
-      { id: 'client2', name: 'TechStart Inc' }
-    ]);
-  }, []);
+    const fetchClients = async () => {
+      if (!token) return;
+      try {
+        const response = await fetch('http://localhost:5000/api/invoices/clients', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setClients(data);
+        }
+      } catch (err) {
+        console.error('Error fetching clients:', err);
+      }
+    };
+    fetchClients();
+  }, [token]);
+
+  // Auto-calculate Due Date whenever termDays changes
+  useEffect(() => {
+    if (!invoiceData.termDays) return;
+
+    const today = new Date();
+    const days = parseInt(invoiceData.termDays);
+    const dueDate = new Date(today);
+    dueDate.setDate(today.getDate() + days);
+
+    const formattedDueDate = dueDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+
+    setInvoiceData(prev => ({
+      ...prev,
+      dueDate: formattedDueDate
+    }));
+  }, [invoiceData.termDays]);
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -33,12 +64,17 @@ function Upload() {
     e.preventDefault();
     e.stopPropagation();
     const droppedFile = e.dataTransfer.files[0];
-    if (droppedFile) setFile(droppedFile);
+    if (droppedFile) {
+      setFile(droppedFile);
+      setError('');
+    }
   };
 
   const handleFileSelect = (e) => {
-    if (e.target.files.length > 0) {
-      setFile(e.target.files[0]);
+    const selectedFile = e.target.files[0];
+    if (selectedFile) {
+      setFile(selectedFile);
+      setError('');
     }
   };
 
@@ -58,7 +94,7 @@ function Upload() {
       return;
     }
 
-    if (!invoiceData.invoiceNumber || !invoiceData.amount || !invoiceData.dueDate || !invoiceData.client) {
+    if (!invoiceData.invoiceNumber || !invoiceData.amount || !invoiceData.dueDate || !invoiceData.clientId) {
       setError("Please fill in all required fields");
       return;
     }
@@ -68,22 +104,18 @@ function Upload() {
     setSuccess(false);
 
     try {
-      const token = localStorage.getItem('token');
-
       const formData = new FormData();
       formData.append('file', file);
       formData.append('invoice_number', invoiceData.invoiceNumber);
       formData.append('total_amount', invoiceData.amount);
       formData.append('due_date', invoiceData.dueDate);
-      formData.append('client_id', invoiceData.client);
+      formData.append('client_id', invoiceData.clientId);
       formData.append('description', invoiceData.description || '');
       formData.append('term_days', invoiceData.termDays);
 
       const response = await fetch('http://localhost:5000/api/invoices/upload', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
+        headers: { 'Authorization': `Bearer ${token}` },
         body: formData,
       });
 
@@ -91,17 +123,15 @@ function Upload() {
 
       if (response.ok) {
         setSuccess(true);
-        // Reset form
         setFile(null);
         setInvoiceData({
           invoiceNumber: '',
           amount: '',
           dueDate: '',
-          client: '',
+          clientId: '',
           description: '',
           termDays: '30'
         });
-        alert(`✅ Invoice uploaded successfully!\nApproval request has been sent to the client.`);
       } else {
         setError(data.error || 'Failed to upload invoice');
       }
@@ -119,21 +149,22 @@ function Upload() {
       invoiceNumber: '',
       amount: '',
       dueDate: '',
-      client: '',
+      clientId: '',
       description: '',
       termDays: '30'
     });
+    setError('');
   };
 
   return (
     <main className="dashboard-main">
       <div className="upload-container">
-        <h1>Upload Invoice</h1>
-        <p className="upload-subtitle">Submit your invoice for quick approval and payment</p>
+        <h1>Upload New Invoice</h1>
+        <p className="upload-subtitle">Submit your invoice for fast approval and 85% advance payment</p>
 
         {success && (
           <div className="alert alert-success mb-4">
-            Invoice uploaded successfully! Approval request sent to the client.
+            Invoice uploaded successfully! Approval request has been sent to the client.
           </div>
         )}
 
@@ -172,7 +203,7 @@ function Upload() {
                 name="invoiceNumber"
                 value={invoiceData.invoiceNumber}
                 onChange={handleInputChange}
-                placeholder="INV-2026-001"
+                placeholder="INV-20260401"
                 required
               />
             </div>
@@ -184,27 +215,41 @@ function Upload() {
                 name="amount"
                 value={invoiceData.amount}
                 onChange={handleInputChange}
-                placeholder="15000"
+                placeholder="15000.00"
                 required
               />
             </div>
 
             <div className="form-group">
-              <label>Due Date</label>
+              <label>Payment Term</label>
+              <select
+                name="termDays"
+                value={invoiceData.termDays}
+                onChange={handleInputChange}
+              >
+                <option value="30">30 days (5% fee)</option>
+                <option value="60">60 days (7.5% fee)</option>
+                <option value="90">90 days (10% fee)</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>Due Date (auto-calculated from term)</label>
               <input
                 type="date"
                 name="dueDate"
                 value={invoiceData.dueDate}
-                onChange={handleInputChange}
-                required
+                readOnly
+                style={{ backgroundColor: '#f8f9fa', cursor: 'not-allowed' }}
               />
+              <small style={{ color: '#666' }}>This date is automatically calculated based on the selected Payment Term</small>
             </div>
 
             <div className="form-group">
               <label>Client / Buyer</label>
               <select
-                name="client"
-                value={invoiceData.client}
+                name="clientId"
+                value={invoiceData.clientId}
                 onChange={handleInputChange}
                 required
               >
@@ -216,32 +261,17 @@ function Upload() {
             </div>
 
             <div className="form-group">
-              <label>Term (Days)</label>
-              <select
-                name="termDays"
-                value={invoiceData.termDays}
-                onChange={handleInputChange}
-                required
-              >
-                <option value="30">30 days (5% fee)</option>
-                <option value="45">45 days (7.5% fee)</option>
-                <option value="90">90 days (10% fee)</option>
-              </select>
-            </div>
-
-            <div className="form-group">
               <label>Description / Services</label>
               <textarea
                 name="description"
                 value={invoiceData.description}
                 onChange={handleInputChange}
-                placeholder="Web development services - February 2026"
+                placeholder="Web development services for February 2026 campaign"
                 rows="4"
               ></textarea>
             </div>
           </div>
 
-          {/* Action Buttons */}
           <div className="form-actions">
             <button 
               type="button" 
@@ -256,7 +286,7 @@ function Upload() {
               className="btn-submit" 
               disabled={loading || !file}
             >
-              {loading ? 'Uploading...' : 'Submit Invoice'}
+              {loading ? 'Uploading Invoice...' : 'Submit for Approval & Funding'}
             </button>
           </div>
         </form>

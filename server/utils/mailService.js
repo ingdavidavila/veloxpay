@@ -16,7 +16,7 @@ const sendPasswordResetEmail = async (toEmail, resetToken) => {
     const resetLink = `${FRONTEND_URL}/reset-password?token=${resetToken}`;
 
     const { data, error } = await resend.emails.send({
-      from: 'Velox Pay <no-reply@veloxpay.com>',
+      from: 'Resend <onboarding@resend.dev>',
       to: toEmail,
       subject: 'Reset Your Velox Pay Password',
       html: `
@@ -56,7 +56,7 @@ const sendInvoiceReminder = async (invoice) => {
       : `Velox Pay - Invoice ${invoice.invoice_number} Due in ${daysUntilDue} Days`;
 
     const { data, error } = await resend.emails.send({
-      from: 'Velox Pay <no-reply@veloxpay.com>',
+      from: 'Resend <onboarding@resend.dev>',
       to: invoice.client_email,
       subject: subject,
       html: `
@@ -89,7 +89,7 @@ const sendInvoiceReminder = async (invoice) => {
 const sendPasswordResetConfirmation = async (toEmail) => {
   try {
     const { data, error } = await resend.emails.send({
-      from: 'Velox Pay <no-reply@veloxpay.com>',
+      from: 'Resend <onboarding@resend.dev>',
       to: toEmail,
       subject: 'Your Velox Pay Password Has Been Reset',
       html: `<p>Your password has been successfully reset.</p>`
@@ -106,7 +106,7 @@ const sendPasswordResetConfirmation = async (toEmail) => {
 const sendRejectionNotificationToSupplier = async (supplierEmail, invoice) => {
   try {
     const { data, error } = await resend.emails.send({
-      from: 'Velox Pay <no-reply@veloxpay.com>',
+      from: 'Resend <onboarding@resend.dev>',
       to: supplierEmail,
       subject: `Invoice ${invoice.invoice_number} Was Rejected`,
       html: `
@@ -140,7 +140,7 @@ const sendApprovalRequestEmail = async (clientEmail, invoice, supplierBusiness) 
     const approvalLink = `${FRONTEND_URL}/approve/${invoice.invoice_number}`;
 
     const { data, error } = await resend.emails.send({
-      from: 'Velox Pay <no-reply@veloxpay.com>',
+      from: 'Resend <onboarding@resend.dev>',
       to: clientEmail,
       subject: `Action Required: Approve Invoice ${invoice.invoice_number}`,
       html: `

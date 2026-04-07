@@ -1,84 +1,55 @@
+// AuthContext.js (updated)
 import React, { createContext, useState, useEffect } from 'react';
 
-/**
- * AuthContext - Manages user authentication state globally
- */
 export const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // Check if user is logged in when component mounts
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    
-    if (token) {
-      // Token exists, user is authenticated
-      setIsAuthenticated(true);
-      
-      // Try to get user info from localStorage
-      const storedUser = localStorage.getItem('user');
-      if (storedUser) {
-        try {
-          setUser(JSON.parse(storedUser));
-        } catch (error) {
-          console.error('Error parsing stored user:', error);
-        }
+    const savedToken = localStorage.getItem('token');
+    const savedUser = localStorage.getItem('user');
+
+    if (savedToken && savedUser) {
+      try {
+        setToken(savedToken);
+        setUser(JSON.parse(savedUser));
+        setIsAuthenticated(true);
+      } catch (e) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
       }
-    } else {
-      // No token, user not authenticated
-      setIsAuthenticated(false);
-      setUser(null);
     }
-    
+
     setIsLoading(false);
   }, []);
 
-  /**
-   * Login - Store token and user data
-   */
-  const login = (token, userData) => {
-    localStorage.setItem('token', token);
+  const login = (newToken, userData) => {
+    localStorage.setItem('token', newToken);
     localStorage.setItem('user', JSON.stringify(userData));
+    setToken(newToken);
     setUser(userData);
     setIsAuthenticated(true);
   };
 
-  /**
-   * Logout - Clear token and user data
-   */
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    setToken(null);
     setUser(null);
     setIsAuthenticated(false);
   };
 
-  /**
-   * Update user data
-   */
-  const updateUser = (userData) => {
-    localStorage.setItem('user', JSON.stringify(userData));
-    setUser(userData);
-  };
-
-  /**
-   * Get current token
-   */
-  const getToken = () => {
-    return localStorage.getItem('token');
-  };
-
   const value = {
     user,
+    token,
     isAuthenticated,
     isLoading,
     login,
     logout,
-    updateUser,
-    getToken,
   };
 
   return (

@@ -39,7 +39,7 @@ const upload = multer({
 // ====================== UPLOAD INVOICE ======================
 router.post('/upload', authenticateToken, upload.single('file'), async (req, res) => {
   try {
-    const supplierId = req.user?.userId || req.user?.id;
+    const supplierId = "6330a481-2ec0-4e73-950f-19916fe0b302";
 
     if (!supplierId) {
       return res.status(401).json({ error: 'Unauthorized' });
@@ -139,7 +139,13 @@ router.post('/upload', authenticateToken, upload.single('file'), async (req, res
 // ====================== GET INVOICE STATS ======================
 router.get('/stats', authenticateToken, async (req, res) => {
   try {
-    const supplierId = req.user?.userId || req.user?.id;
+    const supplierId = req.user?.supplierId;
+
+    if (!supplierId) {
+      return res.status(401).json({ error: 'Supplier ID not found in token. Please log in again.' });
+    }
+
+    console.log('Stats route - supplierId from JWT:', supplierId);   // ← Debug
 
     const statsQuery = `
       SELECT
@@ -155,7 +161,16 @@ router.get('/stats', authenticateToken, async (req, res) => {
 
     const result = await pool.query(statsQuery, [supplierId]);
 
-    res.json(result.rows[0] || { pending: 0, approved: 0, paid: 0, pendingAmount: 0, approvedAmount: 0, paidAmount: 0 });
+    console.log('Stats query result:', result.rows[0]);   // ← Debug
+
+    res.json(result.rows[0] || {
+      pending: 0,
+      approved: 0,
+      paid: 0,
+      pending_amount: 0,
+      approved_amount: 0,
+      paid_amount: 0
+    });
   } catch (error) {
     console.error('Stats error:', error);
     res.status(500).json({ error: 'Failed to fetch stats' });
@@ -165,12 +180,26 @@ router.get('/stats', authenticateToken, async (req, res) => {
 // ====================== GET RECENT INVOICES ======================
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const supplierId = req.user?.userId || req.user?.id;
-    const limit = parseInt(req.query.limit) || 5;
+    const supplierId = req.user?.supplierId;
+
+    if (!supplierId) {
+      return res.status(401).json({ error: 'Supplier ID not found in token. Please log in again.' });
+    }
+
+    console.log('Invoices route - supplierId from JWT:', supplierId);   // ← Debug
+
+    const limit = parseInt(req.query.limit) || 20;
 
     const query = `
-      SELECT i.id, i.invoice_number, i.total_amount, i.status, i.description, 
-             i.due_date, i.created_at, c.name AS client_name
+      SELECT 
+        i.id, 
+        i.invoice_number, 
+        i.total_amount, 
+        i.status, 
+        i.description, 
+        i.due_date, 
+        i.created_at, 
+        c.name AS client_name
       FROM invoices i
       LEFT JOIN customers c ON c.id = i.customer_id
       WHERE i.supplier_id = $1
@@ -179,6 +208,9 @@ router.get('/', authenticateToken, async (req, res) => {
     `;
 
     const result = await pool.query(query, [supplierId, limit]);
+
+    console.log(`Returning ${result.rows.length} invoices for supplierId ${supplierId}`);
+
     res.json(result.rows);
   } catch (error) {
     console.error('Fetch invoices error:', error);
@@ -258,6 +290,29 @@ router.post('/:identifier/client-decision', async (req, res) => {
   } catch (error) {
     console.error('Client decision error:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ====================== GET CLIENTS FOR DROPDOWN ======================
+// Returns all customers (simple version - no supplier filter yet)
+router.get('/clients', authenticateToken, async (req, res) => {
+  try {
+    const query = `
+      SELECT 
+        id,
+        name,
+        email,
+        phone
+      FROM customers 
+      ORDER BY name ASC;
+    `;
+
+    const result = await pool.query(query);
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching clients:', error);
+    res.status(500).json({ error: 'Failed to fetch clients' });
   }
 });
 
