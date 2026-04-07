@@ -146,6 +146,10 @@ function Login() {
             className="auth-button social-btn" 
             onClick={() => googleLogin()}
           >
+            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/2048px-Google_%22G%22_logo.svg.png" 
+         alt="Google" 
+         width="25" 
+         height="25" />
             Continue with Google
           </button>
           <button 
@@ -153,6 +157,12 @@ function Login() {
             className="auth-button social-btn" 
             onClick={handleAppleLogin}
           >
+            <img 
+            src="https://upload.wikimedia.org/wikipedia/commons/f/fa/Apple_logo_black.svg" 
+            alt="Apple" 
+            width="25" 
+            height="25" 
+          />
             Continue with Apple
           </button>
         </div>

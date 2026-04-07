@@ -63,11 +63,6 @@ function Home() {
             We handle collection automatically.
           </p>
 
-          <div className="hero-actions">
-            <Link to="/signup" className="btn btn-gold btn-large">Start Funding Today — Free</Link>
-            <Link to="/login" className="btn btn-outline-gold">Sign in</Link>
-          </div>
-
           <div className="trust-logos">
             <span>Secured by Plaid</span>
             <span>Bank-level security</span>
