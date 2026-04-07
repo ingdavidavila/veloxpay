@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from './useAuth';
+import LoadingSpinner from './components/LoadingSpinner';
 
 function DashboardHome() {
   const { user, token } = useAuth();
@@ -138,6 +139,10 @@ function DashboardHome() {
       setAddingClient(false);
     }
   };
+
+  if (loading) {
+    return <LoadingSpinner message="Loading your dashboard..." />;
+  }
 
   return (
     <main className="dashboard-main">

@@ -39,7 +39,7 @@ const upload = multer({
 // ====================== UPLOAD INVOICE ======================
 router.post('/upload', authenticateToken, upload.single('file'), async (req, res) => {
   try {
-    const supplierId = "6330a481-2ec0-4e73-950f-19916fe0b302";
+    const supplierId = req.user?.userId || req.user?.supplierId;
 
     if (!supplierId) {
       return res.status(401).json({ error: 'Unauthorized' });

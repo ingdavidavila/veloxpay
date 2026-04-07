@@ -636,18 +636,31 @@ body {
   right: 0;
   padding: 2rem 20px 1.5rem;
   border-top: 1px solid #eaeaea;
+  background: #f9f9f9;
+  z-index: 10;
   text-align: center;
   color: #999;
   font-size: 0.9rem;
-  background: #f9f9f9;
-  z-index: 10;
 }
 
+/* Make sure main content has enough bottom padding so footer doesn't overlap */
+.dashboard-main {
+  padding-bottom: 120px;   /* This is the key fix */
+  min-height: calc(100vh - 240px); /* Prevents footer overlap on short pages */
+}
+
+.dashboard-container {
+  position: relative;
+  min-height: 100vh;
+}
+
+/* Footer links */
 .footer-links {
   display: flex;
   justify-content: center;
   gap: 2rem;
   margin-bottom: 1rem;
+  flex-wrap: wrap;
 }
 
 .footer-link {
@@ -658,13 +671,55 @@ body {
 }
 
 .footer-link:hover {
-  color: #007bff;
+  color: #27ae60;
 }
 
 .footer-company {
   font-weight: 500;
   color: #333;
+  margin-top: 8px;
 }
+
+
+/* ====================== FOOTER ====================== */
+.dashboard-footer {
+  position: relative;         /* Changed from absolute */
+  margin-top: auto;           /* Pushes it to bottom when using flex */
+  padding: 2rem 40px 1.5rem;  /* More left padding to account for sidebar */
+  border-top: 1px solid #eaeaea;
+  background: #f9f9f9;
+  text-align: center;
+  color: #999;
+  font-size: 0.9rem;
+  width: 100%;
+  z-index: 10;
+}
+
+/* Footer links */
+.footer-links {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.footer-link {
+  color: #666;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.footer-link:hover {
+  color: #27ae60;
+}
+
+.footer-company {
+  font-weight: 500;
+  color: #333;
+  margin-top: 8px;
+}
+
 /* ====================== PASSWORD INPUT ====================== */
 .password-input-container {
   max-width: 400px;
@@ -785,4 +840,266 @@ body {
   font-size: 16px;
   cursor: pointer;
   padding: 4px;
+}
+
+/* Loading Spinner */
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #27ae60;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 12px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: #888;
+}
+
+.empty-state i {
+  font-size: 3.5rem;
+  margin-bottom: 16px;
+  opacity: 0.6;
+}
+
+.empty-state h3 {
+  margin: 0 0 8px 0;
+  color: #555;
+}
+
+.empty-state p {
+  max-width: 320px;
+  margin: 0 auto;
+}
+
+/* ====================== CLEAN PREMIUM LANDING ====================== */
+.premium-landing {
+  background: #0a0a0a;
+  color: #f0f0f0;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.premium-navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: rgba(10, 10, 10, 0.95);
+  backdrop-filter: blur(12px);
+  z-index: 1000;
+  padding: 1.2rem 5%;
+  border-bottom: 1px solid #222;
+}
+
+.nav-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo {
+  font-size: 1.9rem;
+  font-weight: 700;
+}
+
+.logo-gold { color: #d4af37; }
+.logo-green { color: #27ae60; }
+
+.nav-links a {
+  color: #ddd;
+  margin-left: 2rem;
+  text-decoration: none;
+}
+
+.nav-cta {
+  background: #d4af37;
+  color: #0a0a0a;
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+/* Hero */
+.premium-hero {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a3c2e 100%);
+  display: flex;
+  align-items: center;
+  padding: 0 5%;
+}
+
+.hero-content {
+  max-width: 700px;
+}
+
+.premium-badge {
+  background: rgba(212, 175, 55, 0.15);
+  color: #d4af37;
+  padding: 8px 20px;
+  border-radius: 30px;
+  font-size: 0.95rem;
+  margin-bottom: 1.5rem;
+  display: inline-block;
+}
+
+.hero-content h1 {
+  font-size: 3.8rem;
+  line-height: 1.1;
+  margin-bottom: 1.5rem;
+  color: white;
+}
+
+.hero-subtitle {
+  font-size: 1.35rem;
+  color: #ccc;
+  margin-bottom: 2.5rem;
+}
+
+.hero-actions {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 3rem;
+}
+
+.btn-large {
+  padding: 16px 36px;
+  font-size: 1.15rem;
+}
+
+.btn-gold {
+  background: #d4af37;
+  color: #0a0a0a;
+  border: none;
+  font-weight: 600;
+}
+
+.btn-outline-gold {
+  border: 2px solid #d4af37;
+  color: #d4af37;
+  background: transparent;
+}
+
+/* Sections */
+.section-title {
+  text-align: center;
+  font-size: 2.6rem;
+  margin-bottom: 3rem;
+  color: white;
+}
+
+.features-grid, .fee-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.premium-card {
+  background: #111;
+  border: 1px solid #222;
+  padding: 32px 28px;
+  border-radius: 16px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.premium-card:hover {
+  border-color: #d4af37;
+  transform: translateY(-6px);
+}
+
+.feature-number {
+  font-size: 2.5rem;
+  color: #d4af37;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+
+/* Testimonials */
+.premium-testimonials {
+  background: #111;
+  padding: 100px 5%;
+}
+
+.testimonial-carousel {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.testimonial-card {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 16px;
+  padding: 50px 40px;
+  min-height: 240px;
+}
+
+.testimonial-text {
+  font-size: 1.25rem;
+  line-height: 1.6;
+  color: #ddd;
+  margin-bottom: 2rem;
+}
+
+.funded-amount {
+  color: #27ae60;
+  margin-top: 12px;
+  font-weight: 500;
+}
+
+.carousel-dots {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 30px;
+}
+
+.dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #555;
+  border: none;
+  cursor: pointer;
+}
+
+.dot.active {
+  background: #d4af37;
+  transform: scale(1.4);
+}
+
+/* Fees & CTA */
+.premium-fees, .premium-cta {
+  padding: 100px 5%;
+  text-align: center;
+}
+
+.popular-tag {
+  background: #d4af37;
+  color: #0a0a0a;
+  padding: 4px 16px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  position: absolute;
+  top: -12px;
+  right: 30px;
+}
+
+.cta-subtitle {
+  font-size: 1.2rem;
+  color: #bbb;
+  margin-bottom: 2rem;
 }
