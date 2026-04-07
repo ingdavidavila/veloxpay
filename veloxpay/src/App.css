@@ -913,17 +913,17 @@ body {
   font-weight: 700;
 }
 
-.logo-gold { color: #d4af37; }
+.logo-gold { color: #FFD700; }
 .logo-green { color: #27ae60; }
 
 .nav-links a {
-  color: #ddd;
+  color: darkgreen;
   margin-left: 2rem;
   text-decoration: none;
 }
 
 .nav-cta {
-  background: #d4af37;
+  background: #FFD700;
   color: #0a0a0a;
   padding: 10px 24px;
   border-radius: 8px;
@@ -945,7 +945,7 @@ body {
 
 .premium-badge {
   background: rgba(212, 175, 55, 0.15);
-  color: #d4af37;
+  color: #FFD700;
   padding: 8px 20px;
   border-radius: 30px;
   font-size: 0.95rem;
@@ -979,15 +979,15 @@ body {
 }
 
 .btn-gold {
-  background: #d4af37;
+  background: #FFD700;
   color: #0a0a0a;
   border: none;
   font-weight: 600;
 }
 
 .btn-outline-gold {
-  border: 2px solid #d4af37;
-  color: #d4af37;
+  border: 2px solid #FFD700;
+  color: #FFD700;
   background: transparent;
 }
 
@@ -997,6 +997,10 @@ body {
   font-size: 2.6rem;
   margin-bottom: 3rem;
   color: white;
+}
+
+.premium-features{
+  padding-bottom: 10px;
 }
 
 .features-grid, .fee-grid {
@@ -1017,13 +1021,13 @@ body {
 }
 
 .premium-card:hover {
-  border-color: #d4af37;
+  border-color: #FFD700;
   transform: translateY(-6px);
 }
 
 .feature-number {
   font-size: 2.5rem;
-  color: #d4af37;
+  color: #FFD700;
   font-weight: 700;
   margin-bottom: 16px;
 }
@@ -1077,7 +1081,7 @@ body {
 }
 
 .dot.active {
-  background: #d4af37;
+  background: #FFD700;
   transform: scale(1.4);
 }
 
@@ -1088,7 +1092,7 @@ body {
 }
 
 .popular-tag {
-  background: #d4af37;
+  background: #FFD700;
   color: #0a0a0a;
   padding: 4px 16px;
   border-radius: 20px;
