@@ -2,10 +2,10 @@ import React from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { StatusBar } from 'expo-status-bar';
 
-// Screens (we'll create them next)
+import LandingScreen from './src/screens/LandingScreen';
 import LoginScreen from './src/screens/LoginScreen';
+// import SignupScreen from './src/screens/SignupScreen'; // we'll create later
 
 const Stack = createNativeStackNavigator();
 
@@ -13,30 +13,16 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <NavigationContainer>
-        <StatusBar style="light" backgroundColor="#0a0f0a" />
-
-        <Stack.Navigator
-          initialRouteName="Login"
+        <Stack.Navigator 
+          initialRouteName="Landing"
           screenOptions={{
-            headerStyle: {
-              backgroundColor: '#0a0f0a',
-            },
-            headerTintColor: '#d4af37', // gold
-            headerTitleStyle: {
-              fontWeight: 'bold',
-              color: '#ffffff',
-            },
-            contentStyle: {
-              backgroundColor: '#0a0f0a',
-            },
+            headerShown: false,
+            contentStyle: { backgroundColor: '#0a0f0a' },
           }}
         >
-          <Stack.Screen 
-            name="Login" 
-            component={LoginScreen} 
-            options={{ headerShown: false }} 
-          />
-          {/* We'll add more screens here later: Dashboard, Upload, etc. */}
+          <Stack.Screen name="Landing" component={LandingScreen} />
+          <Stack.Screen name="Login" component={LoginScreen} />
+          {/* <Stack.Screen name="Signup" component={SignupScreen} /> */}
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>
