@@ -1,39 +1,47 @@
-// apps/mobile/src/utils/auth.js
+import React, { useEffect, useState } from 'react';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
-import * as SecureStore from 'expo-secure-store';
+import LandingScreen from './src/screens/LandingScreen';
+import LoginScreen from './src/screens/LoginScreen';
+import { isLoggedIn } from './src/utils/auth';
 
-const TOKEN_KEY = 'veloxpay_auth_token';
-const API_BASE_URL = 'http://10.0.2.2:5000';   // ← Your current IP from Expo
+const Stack = createNativeStackNavigator();
 
-export const saveToken = async (token) => {
-  try {
-    await SecureStore.setItemAsync(TOKEN_KEY, token);
-    console.log('Token saved successfully');
-  } catch (error) {
-    console.error('Failed to save token', error);
+export default function App() {
+  const [initialRoute, setInitialRoute] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const checkLoginStatus = async () => {
+      const loggedIn = await isLoggedIn();
+      setInitialRoute(loggedIn ? 'Dashboard' : 'Landing');   // Change to 'Dashboard' later
+      setLoading(false);
+    };
+
+    checkLoginStatus();
+  }, []);
+
+  if (loading) {
+    return null; // or a simple loading spinner
   }
-};
 
-export const login = async (email, password) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json' 
-      },
-      body: JSON.stringify({ email, password }),
-    });
-
-    const data = await response.json();
-
-    if (response.ok && data.token) {
-      await saveToken(data.token);
-      return { success: true, user: data.user || data };
-    } else {
-      throw new Error(data.message || 'Login failed');
-    }
-  } catch (error) {
-    console.error('Login error:', error);
-    throw error;
-  }
-};
+  return (
+    <SafeAreaProvider>
+      <NavigationContainer>
+        <Stack.Navigator 
+          initialRouteName={initialRoute}
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: '#0a0f0a' },
+          }}
+        >
+          <Stack.Screen name="Landing" component={LandingScreen} />
+          <Stack.Screen name="Login" component={LoginScreen} />
+          {/* <Stack.Screen name="Dashboard" component={DashboardScreen} /> */}
+        </Stack.Navigator>
+      </NavigationContainer>
+    </SafeAreaProvider>
+  );
+}

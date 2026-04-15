@@ -1,7 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator, StyleSheet } from 'react-native';
+import { 
+  View, 
+  Text, 
+  TextInput, 
+  TouchableOpacity, 
+  Alert, 
+  ActivityIndicator, 
+  StyleSheet 
+} from 'react-native';
+import { saveAuthData } from '../utils/auth';
 
-const LoginScreen = () => {
+const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -15,7 +24,6 @@ const LoginScreen = () => {
     setLoading(true);
 
     try {
-      // Correct IP for Android Emulator
       const response = await fetch('http://10.0.2.2:5000/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -25,13 +33,17 @@ const LoginScreen = () => {
       const data = await response.json();
 
       if (response.ok && data.token) {
-        Alert.alert('✅ Success', 'Login successful!');
-        console.log('Token received');
+        const saved = await saveAuthData(data.token, data.user || { email });
+
+      if (saved) {
+        Alert.alert('✅ Welcome back!', 'Login successful');
+        navigation.replace('Dashboard');   // This will be the main screen later
+        }
       } else {
-        Alert.alert('❌ Failed', data.message || 'Invalid credentials');
+        Alert.alert('Login Failed', data.message || 'Invalid email or password');
       }
     } catch (error) {
-      Alert.alert('❌ Error', 'Cannot connect to backend.\nMake sure server is running on port 5000');
+      Alert.alert('Connection Error', 'Cannot connect to server.\nIs your backend running on port 5000?');
       console.error(error);
     } finally {
       setLoading(false);
@@ -40,36 +52,53 @@ const LoginScreen = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>VELOXPAY</Text>
-      <Text style={styles.subtitle}>Invoice Factoring Platform</Text>
+      <TouchableOpacity 
+        style={styles.backButton}
+        onPress={() => navigation.goBack()}
+      >
+        <Text style={styles.backText}>← Back</Text>
+      </TouchableOpacity>
 
-      <View style={styles.card}>
-        <Text style={styles.heading}>Welcome Back</Text>
+      <View style={styles.content}>
+        <Text style={styles.title}>Welcome Back</Text>
+        <Text style={styles.subtitle}>Sign in to manage your invoices</Text>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
+        <View style={styles.form}>
+          <TextInput
+            style={styles.input}
+            placeholder="Email Address"
+            placeholderTextColor="#71717a"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
 
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        />
+          <TextInput
+            style={styles.input}
+            placeholder="Password"
+            placeholderTextColor="#71717a"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+          />
 
-        <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
-          {loading ? (
-            <ActivityIndicator color="#ffffff" />
-          ) : (
-            <Text style={styles.buttonText}>Sign In</Text>
-          )}
-        </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.loginButton} 
+            onPress={handleLogin}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#ffffff" />
+            ) : (
+              <Text style={styles.loginButtonText}>Sign In</Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.forgotButton}>
+            <Text style={styles.forgotText}>Forgot Password?</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -79,50 +108,67 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0a0f0a',
+    paddingHorizontal: 24,
+  },
+  backButton: {
+    marginTop: 60,
+    marginBottom: 20,
+    alignSelf: 'flex-start',
+  },
+  backText: {
+    color: '#d4af37',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  content: {
+    flex: 1,
     justifyContent: 'center',
-    padding: 24,
   },
   title: {
-    fontSize: 48,
+    fontSize: 32,
     fontWeight: 'bold',
-    color: '#d4af37',
+    color: '#ffffff',
     textAlign: 'center',
     marginBottom: 8,
   },
   subtitle: {
-    fontSize: 18,
-    color: '#71717a',
+    fontSize: 17,
+    color: '#a1a1aa',
     textAlign: 'center',
     marginBottom: 40,
   },
-  card: {
-    backgroundColor: '#1a1f1a',
-    padding: 32,
-    borderRadius: 16,
-  },
-  heading: {
-    fontSize: 24,
-    color: '#ffffff',
-    textAlign: 'center',
-    marginBottom: 24,
+  form: {
+    width: '100%',
   },
   input: {
-    backgroundColor: '#27272a',
+    backgroundColor: '#1a1f1a',
     color: '#ffffff',
-    padding: 16,
-    borderRadius: 12,
+    padding: 18,
+    borderRadius: 14,
     marginBottom: 16,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#27272a',
   },
-  button: {
+  loginButton: {
     backgroundColor: '#27ae60',
-    padding: 16,
-    borderRadius: 12,
+    padding: 18,
+    borderRadius: 14,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  loginButtonText: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  forgotButton: {
+    marginTop: 20,
     alignItems: 'center',
   },
-  buttonText: {
-    color: '#ffffff',
-    fontWeight: '600',
-    fontSize: 18,
+  forgotText: {
+    color: '#d4af37',
+    fontSize: 16,
   },
 });
 
