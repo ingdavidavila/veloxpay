@@ -1,4 +1,3 @@
-// apps/mobile/App.js
 import React from 'react';
 import "./global.css";
 
@@ -10,7 +9,10 @@ import LandingScreen from './src/screens/LandingScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import SignupScreen from './src/screens/SignupScreen';
 import ForgotPasswordScreen from './src/screens/ForgotPasswordScreen';
-import DashboardScreen from './src/screens/DashboardScreen';   // ← Add this
+import DashboardScreen from './src/screens/DashboardScreen';
+import ProfileScreen from './src/screens/ProfileScreen';
+import UploadScreen from './src/screens/UploadScreen';
+import InvoicesScreen from './src/screens/InvoicesScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -29,6 +31,9 @@ export default function App() {
         <Stack.Screen name="Signup" component={SignupScreen} />
         <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
         <Stack.Screen name="Dashboard" component={DashboardScreen} />
+        <Stack.Screen name="Profile" component={ProfileScreen} />
+        <Stack.Screen name="Invoices" component={InvoicesScreen} />
+        <Stack.Screen name="Upload" component={UploadScreen} />
       </Stack.Navigator>
       <StatusBar style="light" />
     </NavigationContainer>

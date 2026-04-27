@@ -14,13 +14,13 @@ function ApproveInvoice() {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-  const [actionTaken, setActionTaken] = useState(false);
+  const [ setActionTaken] = useState(false);
+
+
+  
 
   useEffect(() => {
-    fetchInvoice();
-  }, [invoiceId]);
-
-  const fetchInvoice = async () => {
+    const fetchInvoice = async () => {
     try {
       setLoading(true);
       const response = await fetch(`http://localhost:5000/api/invoices/${invoiceId}/public`);
@@ -35,6 +35,9 @@ function ApproveInvoice() {
       setLoading(false);
     }
   };
+  }, [invoiceId]);
+
+  
 
   const handleDecision = async (decision) => {
     if (decision === 'reject' && !rejectionReason.trim()) {
