@@ -1,0 +1,142 @@
+.approval-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a3c2e 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
+
+.approval-container {
+  background: #111;
+  border: 1px solid #222;
+  border-radius: 16px;
+  padding: 40px;
+  max-width: 720px;
+  width: 100%;
+  box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+}
+
+.card-header {
+  border-bottom: 1px solid #333;
+  padding: 1.5rem 0;
+  margin-bottom: 2rem;
+}
+
+.card-header h4 {
+  color: #d4af37;
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+/* Invoice Details */
+.invoice-details {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 12px;
+  padding: 1.8rem;
+  margin-bottom: 2rem;
+}
+
+.invoice-details h5 {
+  color: white;
+  margin-bottom: 1rem;
+}
+
+.invoice-details p {
+  color: #ddd;
+  margin-bottom: 0.75rem;
+}
+
+.invoice-details strong {
+  color: #f0f0f0;
+}
+
+/* Form & Buttons */
+.approval-section .btn-lg {
+  padding: 14px 28px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  border-radius: 10px;
+  width: 100%;
+  margin: 8px 0;
+}
+
+.btn-success {
+  background: #27ae60;
+  color: white;
+  border: none;
+}
+
+.btn-success:hover {
+  background: #229954;
+}
+
+.btn-danger {
+  background: #dc3545;
+  color: white;
+  border: none;
+}
+
+.btn-danger:hover {
+  background: #c82333;
+}
+
+.btn-secondary {
+  background: #555;
+  color: white;
+  border: none;
+}
+
+.btn-secondary:hover {
+  background: #666;
+}
+
+/* Rejection Textarea */
+textarea.form-control {
+  background: #1f1f1f;
+  border: 1px solid #444;
+  color: #f0f0f0;
+  border-radius: 10px;
+  padding: 14px;
+  min-height: 130px;
+  font-size: 1rem;
+}
+
+textarea.form-control:focus {
+  border-color: #d4af37;
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.2);
+  outline: none;
+}
+
+/* Alerts */
+.alert-success {
+  background: #1f3a2a;
+  border: 1px solid #2e5c3f;
+  color: #4ade80;
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.alert-danger {
+  background: #4a1f1f;
+  border: 1px solid #6b2c2c;
+  color: #ff8080;
+  border-radius: 10px;
+  padding: 16px;
+}
+
+/* Success Screen */
+.success-screen h2 {
+  color: #27ae60;
+}
+
+.success-screen p.lead {
+  color: #ddd;
+  font-size: 1.15rem;
+}
+
+p, h5{
+  color: #ddd;
+}

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import './ApproveInvoice.css';
 
 function ApproveInvoice() {
   const { invoiceId } = useParams();
@@ -13,13 +14,13 @@ function ApproveInvoice() {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-  const [actionTaken, setActionTaken] = useState(false);
+  const [ setActionTaken] = useState(false);
+
+
+  
 
   useEffect(() => {
-    fetchInvoice();
-  }, [invoiceId]);
-
-  const fetchInvoice = async () => {
+    const fetchInvoice = async () => {
     try {
       setLoading(true);
       const response = await fetch(`http://localhost:5000/api/invoices/${invoiceId}/public`);
@@ -34,6 +35,9 @@ function ApproveInvoice() {
       setLoading(false);
     }
   };
+  }, [invoiceId]);
+
+  
 
   const handleDecision = async (decision) => {
     if (decision === 'reject' && !rejectionReason.trim()) {
@@ -97,23 +101,21 @@ function ApproveInvoice() {
   }
 
   return (
-    <div className="container mt-5">
-      <div className="card shadow">
-        <div className="card-header bg-primary text-white">
+    <div className="approval-page">
+      <div className="approval-container">
+        <div className="card-header">
           <h4>Invoice Approval</h4>
         </div>
-        <div className="card-body">
-          {/* Invoice details display */}
-          <h5>Invoice #{invoice?.invoiceNumber}</h5>
-          <p><strong>Amount:</strong> ${parseFloat(invoice?.totalAmount || 0).toLocaleString()}</p>
-          <p><strong>Due Date:</strong> {invoice?.dueDate ? new Date(invoice.dueDate).toLocaleDateString() : 'N/A'}</p>
-          <p><strong>Supplier:</strong> {invoice?.supplierBusinessName}</p>
+        <div className="invoice-details">
+          <h5>Invoice #{invoice?.invoice_number}</h5>
+          <p><strong>Amount:</strong> ${parseFloat(invoice?.total_amount || 0).toLocaleString()}</p>
+          <p><strong>Due Date:</strong> {invoice?.due_date ? new Date(invoice.due_date).toLocaleDateString() : 'N/A'}</p>
+          <p><strong>Supplier:</strong> {invoice?.supplier_business_name || 'N/A'}</p>
           {invoice?.description && <p><strong>Description:</strong> {invoice.description}</p>}
-
-          <hr />
-
+        </div>
+        <div>
           <div className="text-center">
-            <p className="text-muted">Please make your decision below:</p>
+            <p>Please make your decision below:</p>
 
             {!showRejectReason ? (
               <div className="d-grid gap-3">

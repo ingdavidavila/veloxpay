@@ -12,10 +12,11 @@
     "bootstrap-icons": "^1.13.1",
     "google-auth-library": "^10.6.2",
     "jsonwebtoken": "^9.0.3",
+    "jspdf": "^4.2.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-plaid-link": "^4.1.1",
-    "react-router-dom": "^7.13.1",
+    "react-router-dom": "^7.14.2",
     "react-scripts": "5.0.1",
     "web-vitals": "^2.1.4"
   },
@@ -29,6 +30,9 @@
     "extends": [
       "react-app",
       "react-app/jest"
+    ],
+    "ignorePatterns": [
+      "node_modules/dompurify"
     ]
   },
   "browserslist": {
