@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { getToken } from '@veloxpay/auth';
+import { apiUrl } from '../config/api';
 
 const UploadScreen = ({ navigation }) => {
   const [invoiceNumber, setInvoiceNumber] = useState('');
@@ -114,7 +115,7 @@ const UploadScreen = ({ navigation }) => {
         type: 'image/jpeg',
       });
 
-      const response = await fetch('http://10.0.2.2:5000/api/invoices/upload', {
+      const response = await fetch(apiUrl('/api/invoices/upload'), {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

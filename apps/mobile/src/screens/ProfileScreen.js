@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getToken } from '@veloxpay/auth';
+import { apiUrl } from '../config/api';
 
 const ProfileScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
@@ -44,7 +45,7 @@ const ProfileScreen = ({ navigation }) => {
         return;
       }
 
-      const userRes = await fetch('http://10.0.2.2:5000/api/auth/me', {
+      const userRes = await fetch(apiUrl('/api/auth/me'), {
         headers: { 'Authorization': `Bearer ${token}` },
       });
 
@@ -58,7 +59,7 @@ const ProfileScreen = ({ navigation }) => {
         setBankConnected(!!userData.supplier_plaid_access_token || !!userData.has_bank_account);
       }
 
-      const statsRes = await fetch('http://10.0.2.2:5000/api/invoices/stats', {
+      const statsRes = await fetch(apiUrl('/api/invoices/stats'), {
         headers: { 'Authorization': `Bearer ${token}` },
       });
 
@@ -83,7 +84,7 @@ const ProfileScreen = ({ navigation }) => {
     setPlaidLoading(true);
     try {
       const token = await getToken();
-      const response = await fetch('http://10.0.2.2:5000/api/plaid/supplier-link-token', {
+      const response = await fetch(apiUrl('/api/plaid/supplier-link-token'), {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -113,7 +114,7 @@ const ProfileScreen = ({ navigation }) => {
   const handleSaveChanges = async () => {
     try {
       const token = await getToken();
-      const response = await fetch('http://10.0.2.2:5000/api/user/profile', {
+      const response = await fetch(apiUrl('/api/user/profile'), {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,

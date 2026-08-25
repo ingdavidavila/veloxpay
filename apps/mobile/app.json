@@ -1,8 +1,9 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
+    "name": "VeloxPay",
+    "slug": "veloxpay-mobile",
     "version": "1.0.0",
+    "scheme": "veloxpay",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -13,7 +14,17 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "bundleIdentifier": "com.veloxpay.mobile",
+      "buildNumber": "1",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "VeloxPay uses the camera to capture invoice photos for upload.",
+        "NSPhotoLibraryUsageDescription": "VeloxPay needs photo library access so you can select invoice images for upload.",
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        },
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {

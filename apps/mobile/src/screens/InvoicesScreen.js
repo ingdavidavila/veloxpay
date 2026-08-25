@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getToken } from '@veloxpay/auth';
+import { apiUrl } from '../config/api';
 
 const InvoicesScreen = ({ navigation }) => {
   const [invoices, setInvoices] = useState([]);
@@ -36,7 +37,7 @@ const InvoicesScreen = ({ navigation }) => {
       }
 
       const response = await fetch(
-        `http://10.0.2.2:5000/api/invoices?page=${currentPage}&limit=${limit}`,
+        apiUrl(`/api/invoices?page=${currentPage}&limit=${limit}`),
         {
           headers: { 'Authorization': `Bearer ${token}` },
         }

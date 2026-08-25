@@ -10,6 +10,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { apiUrl } from '../config/api';
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -25,7 +26,7 @@ const LoginScreen = ({ navigation }) => {
   setLoading(true);
 
   try {
-    const response = await fetch('http://10.0.2.2:5000/api/auth/login', {
+    const response = await fetch(apiUrl('/api/auth/login'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),

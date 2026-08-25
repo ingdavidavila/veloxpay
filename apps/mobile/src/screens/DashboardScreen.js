@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getToken } from '@veloxpay/auth';
+import { apiUrl } from '../config/api';
 
 const DashboardScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
@@ -39,7 +40,7 @@ const DashboardScreen = ({ navigation }) => {
       }
 
       // Fetch Stats
-      const statsResponse = await fetch('http://10.0.2.2:5000/api/invoices/stats', {
+      const statsResponse = await fetch(apiUrl('/api/invoices/stats'), {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -60,7 +61,7 @@ const DashboardScreen = ({ navigation }) => {
       }
 
       // Fetch Recent Invoices
-      const invoicesResponse = await fetch('http://10.0.2.2:5000/api/invoices?limit=5', {
+      const invoicesResponse = await fetch(apiUrl('/api/invoices?limit=5'), {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -74,7 +75,7 @@ const DashboardScreen = ({ navigation }) => {
       }
 
       // Get business name
-      const userResponse = await fetch('http://10.0.2.2:5000/api/auth/me', {
+      const userResponse = await fetch(apiUrl('/api/auth/me'), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (userResponse.ok) {
