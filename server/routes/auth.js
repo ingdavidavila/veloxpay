@@ -391,4 +391,126 @@ router.post("/auth/apple", async (req, res) => {
   }
 });
 
+// ======================
+// CURRENT USER
+// ======================
+// GET /api/auth/me
+// Consumed by DashboardScreen.js and ProfileScreen.js, which read
+// business_name / name / email / phone and a bank-connected flag.
+//
+// The clients check `supplier_plaid_access_token || has_bank_account`, but we
+// deliberately do NOT return the Plaid access token -- that is a server-side
+// secret and must never reach a client. has_bank_account carries the same
+// signal, and the clients' || falls through to it.
+const handleMe = async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      return res.status(401).json({ error: "User ID not found in token. Please log in again." });
+    }
+
+    const result = await pool.query(
+      `
+      SELECT
+        u.id,
+        u.name,
+        u.business_name,
+        u.email,
+        u.phone_number AS phone,
+        u.avatar,
+        u.created_at,
+        s.id AS supplier_id,
+        COALESCE(s.bank_connected, FALSE) AS has_bank_account
+      FROM users u
+      LEFT JOIN suppliers s ON s.user_id = u.id
+      WHERE u.id = $1
+      `,
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error("Fetch current user error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+router.get("/auth/me", authenticateToken, handleMe);
+// Alias, matching the /signup + /auth/signup pairing used above.
+router.get("/me", authenticateToken, handleMe);
+
+// ======================
+// UPDATE PROFILE
+// ======================
+// PUT /api/user/profile
+// Consumed by ProfileScreen.js and apps/web/src/Profile.js, which both send
+// { business_name, phone } and expect { user } back.
+//
+// business_name is mirrored onto the supplier row because invoices join
+// suppliers for the display name -- leaving them out of sync would make an
+// edited profile show the old business name on every invoice.
+router.put("/user/profile", authenticateToken, async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      return res.status(401).json({ error: "User ID not found in token. Please log in again." });
+    }
+
+    const { business_name, phone, name } = req.body;
+
+    await client.query("BEGIN");
+
+    // COALESCE($n, column) leaves a field untouched when the client omits it,
+    // so a partial update cannot blank out the other fields.
+    const updated = await client.query(
+      `
+      UPDATE users
+      SET business_name = COALESCE($1, business_name),
+          phone_number  = COALESCE($2, phone_number),
+          name          = COALESCE($3, name),
+          updated_at    = NOW()
+      WHERE id = $4
+      RETURNING id, name, business_name, email, phone_number AS phone, avatar, created_at, updated_at
+      `,
+      [business_name ?? null, phone ?? null, name ?? null, userId]
+    );
+
+    if (updated.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    await client.query(
+      `
+      UPDATE suppliers
+      SET business_name = COALESCE($1, business_name),
+          name          = COALESCE($2, name)
+      WHERE user_id = $3
+      `,
+      [business_name ?? null, name ?? null, userId]
+    );
+
+    await client.query("COMMIT");
+
+    res.json({
+      message: "Profile updated successfully",
+      user: updated.rows[0],
+    });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Update profile error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  } finally {
+    client.release();
+  }
+});
+
 module.exports = router;

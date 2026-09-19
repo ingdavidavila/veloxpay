@@ -147,14 +147,18 @@ router.get('/stats', authenticateToken, async (req, res) => {
 
     console.log('Stats route - supplierId from JWT:', supplierId);   // ← Debug
 
+    // The ::int / ::float casts are load-bearing, not cosmetic.
+    // COUNT() returns bigint and SUM() returns numeric; node-postgres hands
+    // both back as STRINGS to avoid precision loss. Without these casts the
+    // clients do "0" + "0" + "0" and render "000" instead of 0.
     const statsQuery = `
       SELECT
-        COUNT(CASE WHEN status = 'pending' THEN 1 END) AS pending,
-        COUNT(CASE WHEN status = 'approved' THEN 1 END) AS approved,
-        COUNT(CASE WHEN status = 'paid' THEN 1 END) AS paid,
-        COALESCE(SUM(CASE WHEN status = 'pending' THEN total_amount ELSE 0 END), 0) AS pending_amount,
-        COALESCE(SUM(CASE WHEN status = 'approved' THEN total_amount ELSE 0 END), 0) AS approved_amount,
-        COALESCE(SUM(CASE WHEN status = 'paid' THEN total_amount ELSE 0 END), 0) AS paid_amount
+        COUNT(CASE WHEN status = 'pending' THEN 1 END)::int AS pending,
+        COUNT(CASE WHEN status = 'approved' THEN 1 END)::int AS approved,
+        COUNT(CASE WHEN status = 'paid' THEN 1 END)::int AS paid,
+        COALESCE(SUM(CASE WHEN status = 'pending' THEN total_amount ELSE 0 END), 0)::float AS pending_amount,
+        COALESCE(SUM(CASE WHEN status = 'approved' THEN total_amount ELSE 0 END), 0)::float AS approved_amount,
+        COALESCE(SUM(CASE WHEN status = 'paid' THEN total_amount ELSE 0 END), 0)::float AS paid_amount
       FROM invoices
       WHERE supplier_id = $1;
     `;
