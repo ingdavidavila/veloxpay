@@ -259,7 +259,7 @@ function DashboardHome() {
           </div>
         ) : recentInvoices.length === 0 ? (
           <div className="text-center py-4">
-            <p>No invoices yet. <Link to="/upload">Create your first invoice</Link></p>
+            <p>No invoices yet. <Link to="/dashboard/upload">Create your first invoice</Link></p>
           </div>
         ) : (
           <>

@@ -11,7 +11,10 @@ function Profile() {
   const [bankConnected, setBankConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   const [linkToken, setLinkToken] = useState(null);
-  const [setError] = useState(null);
+  // NB: this was `const [setError] = useState(null)`, which destructures the
+  // state VALUE (null) into a variable named setError -- so every setError(...)
+  // call threw "setError is not a function". The state name was missing.
+  const [error, setError] = useState(null);
 
   const [profileData, setProfileData] = useState({
     businessName: '',
@@ -48,7 +51,14 @@ function Profile() {
           const data = await response.json();
           setStats({
             totalInvoices: (data.pending || 0) + (data.approved || 0) + (data.paid || 0),
-            totalEarned: (data.pendingAmount || 0) + (data.approvedAmount || 0) + (data.paidAmount || 0),
+            // The API sends snake_case (pending_amount, ...). Reading
+            // camelCase here left all three undefined, so Total Earned was
+            // permanently $0. Number() guards against the values arriving as
+            // strings, which is what pg does with un-cast numeric columns.
+            totalEarned:
+              Number(data.pending_amount || 0) +
+              Number(data.approved_amount || 0) +
+              Number(data.paid_amount || 0),
             approved: data.approved || 0,
           });
         }
@@ -286,6 +296,14 @@ function Profile() {
               </div>
             </div>
           </div>
+
+          {/* Bank-connection failures set `error`; without this they were
+              silent -- the fetch failed and the user saw nothing happen. */}
+          {error && (
+            <p style={{ color: '#c0392b', margin: '12px 0' }} role="alert">
+              {error}
+            </p>
+          )}
 
           {/* Show Plaid Open Button when linkToken is ready */}
           {linkToken && (
