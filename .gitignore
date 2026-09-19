@@ -94,4 +94,5 @@ tmp/
 # Optional: Database files (if you ever use SQLite)
 # ========================================
 *.sqlite
-*.db
+*.db.env.backup*
+.env.bak
