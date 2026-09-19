@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getToken } from '@veloxpay/auth';
 import { apiUrl } from '../config/api';
+import { resetToAuth } from '../navigation/resetToAuth';
 
 const InvoicesScreen = ({ navigation }) => {
   const [invoices, setInvoices] = useState([]);
@@ -32,7 +33,7 @@ const InvoicesScreen = ({ navigation }) => {
       const token = await getToken();
       if (!token) {
         Alert.alert('Session Expired', 'Please log in again');
-        navigation.replace('Login');
+        resetToAuth(navigation);
         return;
       }
 

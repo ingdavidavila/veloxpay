@@ -8,6 +8,9 @@ import {
   Alert,
   ActivityIndicator,
   StyleSheet,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiUrl } from '../config/api';
@@ -57,14 +60,23 @@ const LoginScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <TouchableOpacity
-        style={styles.backButton}
-        onPress={() => navigation.goBack()}
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <Text style={styles.backText}>← Back</Text>
-      </TouchableOpacity>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.backText}>← Back</Text>
+          </TouchableOpacity>
 
-      <View style={styles.content}>
+          <View style={styles.content}>
         <Text style={styles.title}>Welcome Back</Text>
         <Text style={styles.subtitle}>Sign in to manage your invoices</Text>
 
@@ -108,7 +120,9 @@ const LoginScreen = ({ navigation }) => {
   <Text style={styles.forgotText}>Forgot Password?</Text>
 </TouchableOpacity>
         </View>
-      </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -129,8 +143,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
   },
+  flex: { flex: 1 },
+  // flexGrow (not flex) so the form still centres on a tall screen but is
+  // free to grow past the viewport -- and scroll -- once the keyboard opens.
+  scrollContent: { flexGrow: 1, paddingBottom: 40 },
   content: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: 'center',
   },
   title: {

@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { getToken } from '@veloxpay/auth';
 import { apiUrl } from '../config/api';
+import { resetToAuth } from '../navigation/resetToAuth';
 
 const UploadScreen = ({ navigation }) => {
   const [invoiceNumber, setInvoiceNumber] = useState('');
@@ -97,7 +98,7 @@ const UploadScreen = ({ navigation }) => {
       const token = await getToken();
       if (!token) {
         Alert.alert('Error', 'Please log in again');
-        navigation.replace('Login');
+        resetToAuth(navigation);
         return;
       }
 

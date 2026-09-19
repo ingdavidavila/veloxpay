@@ -7,6 +7,9 @@ import {
   Alert,
   ActivityIndicator,
   StyleSheet,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiUrl } from '../config/api';
@@ -54,14 +57,23 @@ const ForgotPasswordScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <TouchableOpacity
-        style={styles.backButton}
-        onPress={() => navigation.goBack()}
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <Text style={styles.backText}>← Back</Text>
-      </TouchableOpacity>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.backText}>← Back</Text>
+          </TouchableOpacity>
 
-      <View style={styles.content}>
+          <View style={styles.content}>
         <Text style={styles.title}>Forgot Password?</Text>
         <Text style={styles.subtitle}>
           Enter your email address and we'll send you instructions to reset your password.
@@ -98,7 +110,9 @@ const ForgotPasswordScreen = ({ navigation }) => {
             <Text style={styles.backToLoginText}>Back to Sign In</Text>
           </TouchableOpacity>
         </View>
-      </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -119,8 +133,10 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
   },
+  flex: { flex: 1 },
+  scrollContent: { flexGrow: 1, paddingBottom: 40 },
   content: {
-    flex: 1,
+    flexGrow: 1,
   },
   title: {
     fontSize: 32,

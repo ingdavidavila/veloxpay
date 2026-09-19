@@ -1,4 +1,5 @@
 // apps/mobile/src/screens/SignupScreen.js
+import { saveAuthData } from '@veloxpay/auth';
 import React, { useState } from 'react';
 import {
   View,
@@ -8,8 +9,12 @@ import {
   Alert,
   ActivityIndicator,
   StyleSheet,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { apiUrl } from '../config/api';
 
 const SignupScreen = ({ navigation }) => {
   const [businessName, setBusinessName] = useState('');
@@ -19,8 +24,74 @@ const SignupScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
 
   const handleSignup = async () => {
-    // ... your existing validation and fetch logic (keep it as is)
-    // For now we'll keep the same handleSignup
+    if (!businessName || !email || !password) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      Alert.alert('Error', 'Passwords do not match');
+      return;
+    }
+
+    // Mirrors server/middleware/passwordValidator.js so the user gets
+    // feedback before a round trip.
+    const passwordProblems = [
+      [/^.{8,}$/, 'At least 8 characters'],
+      [/[A-Z]/, 'At least one uppercase letter'],
+      [/[a-z]/, 'At least one lowercase letter'],
+      [/[!@#$%^&*()_+\-=[\]{};:"\\|,.<>/?]/, 'At least one special character'],
+    ]
+      .filter(([regex]) => !regex.test(password))
+      .map(([, message]) => message);
+
+    if (passwordProblems.length > 0) {
+      Alert.alert('Invalid Password', passwordProblems.join('\n'));
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const response = await fetch(apiUrl('/api/auth/signup'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: businessName,
+          business_name: businessName,
+          email,
+          phone_number: '',
+          bank_account: '',
+          password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.token) {
+        const saved = await saveAuthData(data.token, data.user || { email });
+
+        if (saved) {
+          Alert.alert('✅ Welcome to VeloxPay!', 'Account created successfully');
+          navigation.replace('Dashboard');
+        }
+      } else {
+        // The server sends { error } and, for password failures, { error, rules }.
+        Alert.alert(
+          'Signup Failed',
+          [data.error, ...(data.rules || [])].filter(Boolean).join('\n') ||
+            'Could not create account'
+        );
+      }
+    } catch (error) {
+      Alert.alert(
+        'Connection Error',
+        'Cannot connect to server.\nMake sure your backend is running.'
+      );
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleGoogleSignup = () => {
@@ -35,14 +106,23 @@ const SignupScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <TouchableOpacity
-        style={styles.backButton}
-        onPress={() => navigation.goBack()}
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <Text style={styles.backText}>← Back</Text>
-      </TouchableOpacity>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.backText}>← Back</Text>
+          </TouchableOpacity>
 
-      <View style={styles.content}>
+          <View style={styles.content}>
         <Text style={styles.title}>Create Account</Text>
         <Text style={styles.subtitle}>Join VeloxPay and get paid faster</Text>
 
@@ -117,7 +197,9 @@ const SignupScreen = ({ navigation }) => {
             </Text>
           </TouchableOpacity>
         </View>
-      </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -128,9 +210,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#0a0f0a',
     paddingHorizontal: 24,
   },
+  flex: { flex: 1 },
+  // Never put flex:1 on a ScrollView's contentContainerStyle -- it pins the
+  // content to the viewport height and scrolling silently stops working.
+  // flexGrow:1 lets short content still fill the screen.
+  scrollContent: { flexGrow: 1, paddingBottom: 40 },
   backButton: { marginTop: 60, marginBottom: 30, alignSelf: 'flex-start' },
   backText: { color: '#d4af37', fontSize: 18, fontWeight: '600' },
-  content: { flex: 1 },
+  content: { flexGrow: 1 },
   title: {
     fontSize: 32,
     fontWeight: 'bold',

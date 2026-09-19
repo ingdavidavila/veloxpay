@@ -11,8 +11,9 @@ import {
   StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getToken } from '@veloxpay/auth';
+import { getToken, logout } from '@veloxpay/auth';
 import { apiUrl } from '../config/api';
+import { resetToAuth } from '../navigation/resetToAuth';
 
 const ProfileScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
@@ -41,7 +42,7 @@ const ProfileScreen = ({ navigation }) => {
       const token = await getToken();
       if (!token) {
         Alert.alert('Session Expired', 'Please log in again');
-        navigation.replace('Login');
+        resetToAuth(navigation);
         return;
       }
 
@@ -143,7 +144,16 @@ const ProfileScreen = ({ navigation }) => {
       'Are you sure you want to log out?',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Yes, Log Out', style: 'destructive', onPress: () => navigation.replace('Login') },
+        {
+          text: 'Yes, Log Out',
+          style: 'destructive',
+          // Clear the stored credentials BEFORE navigating. Without this the
+          // JWT stays in SecureStore and is still valid for its full 7 days.
+          onPress: async () => {
+            await logout();
+            resetToAuth(navigation);
+          },
+        },
       ]
     );
   };
