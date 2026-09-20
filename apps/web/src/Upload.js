@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import { useRefreshOnFocus } from './useRefreshOnFocus';
+import { useAuthFetch, isSessionExpired } from './useAuthFetch';
 
 function Upload() {
   const { token } = useAuth();
@@ -55,7 +56,7 @@ function Upload() {
 
     setSavingClient(true);
     try {
-      const response = await fetch('http://localhost:5000/api/invoices/clients', {
+      const response = await authFetch('http://localhost:5000/api/invoices/clients', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -81,6 +82,7 @@ function Upload() {
       setClientToast(`${data.client.name} added`);
       setTimeout(() => setClientToast(''), 4000);
     } catch (err) {
+      if (isSessionExpired(err)) return;
       console.error('Error creating client:', err);
       setClientError('Network error. Please try again.');
     } finally {
@@ -91,6 +93,7 @@ function Upload() {
   // Fetch clients
   // Bumping this re-runs the fetch effect below. The fetch lives inside
   // that effect, so this is the least invasive way to refetch.
+  const authFetch = useAuthFetch();
   const [refreshKey, setRefreshKey] = useState(0);
   useRefreshOnFocus(() => setRefreshKey((k) => k + 1));
 
@@ -98,7 +101,7 @@ function Upload() {
     const fetchClients = async () => {
       if (!token) return;
       try {
-        const response = await fetch('http://localhost:5000/api/invoices/clients', {
+        const response = await authFetch('http://localhost:5000/api/invoices/clients', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (response.ok) {
@@ -106,6 +109,7 @@ function Upload() {
           setClients(data);
         }
       } catch (err) {
+        if (isSessionExpired(err)) return;
         console.error('Error fetching clients:', err);
       }
     };
@@ -187,7 +191,7 @@ function Upload() {
       formData.append('description', invoiceData.description || '');
       formData.append('term_days', invoiceData.termDays);
 
-      const response = await fetch('http://localhost:5000/api/invoices/upload', {
+      const response = await authFetch('http://localhost:5000/api/invoices/upload', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData,
@@ -210,6 +214,7 @@ function Upload() {
         setError(data.error || 'Failed to upload invoice');
       }
     } catch (err) {
+      if (isSessionExpired(err)) return;
       setError('Network error. Please check your connection and try again.');
       console.error('Upload error:', err);
     } finally {

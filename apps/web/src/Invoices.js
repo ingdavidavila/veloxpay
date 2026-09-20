@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import { useRefreshOnFocus } from './useRefreshOnFocus';
+import { useAuthFetch, isSessionExpired } from './useAuthFetch';
 
 function Invoices() {
   const { user } = useAuth();
@@ -11,6 +12,7 @@ function Invoices() {
 
   // Bumping this re-runs the fetch effect below. The fetch lives inside
   // that effect, so this is the least invasive way to refetch.
+  const authFetch = useAuthFetch();
   const [refreshKey, setRefreshKey] = useState(0);
   useRefreshOnFocus(() => setRefreshKey((k) => k + 1));
 
@@ -29,7 +31,7 @@ function Invoices() {
       return;
     }
 
-    const response = await fetch('http://localhost:5000/api/invoices?limit=50', {
+    const response = await authFetch('http://localhost:5000/api/invoices?limit=50', {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -49,7 +51,8 @@ function Invoices() {
       setError(`Failed to load invoices (${response.status})`);
     }
   } catch (err) {
-    console.error('Network error fetching invoices:', err);
+    if (isSessionExpired(err)) return;
+        console.error('Network error fetching invoices:', err);
     setError('Network error while loading invoices');
   } finally {
     setLoading(false);

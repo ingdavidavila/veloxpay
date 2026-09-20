@@ -20,8 +20,10 @@ import * as ImagePicker from 'expo-image-picker';
 import { getToken } from '@veloxpay/auth';
 import { apiUrl } from '../config/api';
 import { resetToAuth } from '../navigation/resetToAuth';
+import { useAuthFetch, isSessionExpired } from '../api/useAuthFetch';
 
 const UploadScreen = ({ navigation }) => {
+  const authFetch = useAuthFetch(navigation);
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [totalAmount, setTotalAmount] = useState('');
   const [dueDate, setDueDate] = useState('');
@@ -45,7 +47,7 @@ const UploadScreen = ({ navigation }) => {
     try {
       const token = await getToken();
       if (!token) return;
-      const res = await fetch(apiUrl('/api/invoices/clients'), {
+      const res = await authFetch(apiUrl('/api/invoices/clients'), {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) setClients(await res.json());
@@ -71,7 +73,7 @@ const UploadScreen = ({ navigation }) => {
     setSavingClient(true);
     try {
       const token = await getToken();
-      const res = await fetch(apiUrl('/api/invoices/clients'), {
+      const res = await authFetch(apiUrl('/api/invoices/clients'), {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -97,6 +99,9 @@ const UploadScreen = ({ navigation }) => {
       setNewClient({ name: '', duns_number: '', contact_name: '', email: '', address: '' });
       Alert.alert('✅ Client added', `${data.client.name} is now selected.`);
     } catch (e) {
+      // The 401 handler already sent the user to Login; an alert on top
+      // of the login screen would just be noise.
+      if (isSessionExpired(e)) return;
       Alert.alert('Connection Error', 'Cannot reach the server. Is the backend running?');
       console.error(e);
     } finally {
@@ -192,7 +197,7 @@ const UploadScreen = ({ navigation }) => {
         type: 'image/jpeg',
       });
 
-      const response = await fetch(apiUrl('/api/invoices/upload'), {
+      const response = await authFetch(apiUrl('/api/invoices/upload'), {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -219,6 +224,7 @@ const UploadScreen = ({ navigation }) => {
         Alert.alert('Upload Failed', data.message || 'Please try again');
       }
     } catch (error) {
+      if (isSessionExpired(error)) return;
       console.error(error);
       Alert.alert('Upload Failed', 'Could not connect to server.');
     } finally {

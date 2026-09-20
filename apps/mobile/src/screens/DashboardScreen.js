@@ -14,8 +14,10 @@ import { useFocusEffect } from '@react-navigation/native';
 import { getToken } from '@veloxpay/auth';
 import { apiUrl } from '../config/api';
 import { resetToAuth } from '../navigation/resetToAuth';
+import { useAuthFetch, isSessionExpired } from '../api/useAuthFetch';
 
 const DashboardScreen = ({ navigation }) => {
+  const authFetch = useAuthFetch(navigation);
   const [loading, setLoading] = useState(true);
   const [businessName, setBusinessName] = useState('Your Business');
   const [stats, setStats] = useState({
@@ -48,7 +50,7 @@ const DashboardScreen = ({ navigation }) => {
       }
 
       // Fetch Stats
-      const statsResponse = await fetch(apiUrl('/api/invoices/stats'), {
+      const statsResponse = await authFetch(apiUrl('/api/invoices/stats'), {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -69,7 +71,7 @@ const DashboardScreen = ({ navigation }) => {
       }
 
       // Fetch Recent Invoices
-      const invoicesResponse = await fetch(apiUrl('/api/invoices?limit=5'), {
+      const invoicesResponse = await authFetch(apiUrl('/api/invoices?limit=5'), {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -83,7 +85,7 @@ const DashboardScreen = ({ navigation }) => {
       }
 
       // Get business name
-      const userResponse = await fetch(apiUrl('/api/auth/me'), {
+      const userResponse = await authFetch(apiUrl('/api/auth/me'), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (userResponse.ok) {

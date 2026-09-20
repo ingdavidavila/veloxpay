@@ -15,8 +15,10 @@ import { useFocusEffect } from '@react-navigation/native';
 import { getToken, logout } from '@veloxpay/auth';
 import { apiUrl } from '../config/api';
 import { resetToAuth } from '../navigation/resetToAuth';
+import { useAuthFetch, isSessionExpired } from '../api/useAuthFetch';
 
 const ProfileScreen = ({ navigation }) => {
+  const authFetch = useAuthFetch(navigation);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [bankConnected, setBankConnected] = useState(false);
@@ -49,7 +51,7 @@ const ProfileScreen = ({ navigation }) => {
         return;
       }
 
-      const userRes = await fetch(apiUrl('/api/auth/me'), {
+      const userRes = await authFetch(apiUrl('/api/auth/me'), {
         headers: { 'Authorization': `Bearer ${token}` },
       });
 
@@ -63,7 +65,7 @@ const ProfileScreen = ({ navigation }) => {
         setBankConnected(!!userData.supplier_plaid_access_token || !!userData.has_bank_account);
       }
 
-      const statsRes = await fetch(apiUrl('/api/invoices/stats'), {
+      const statsRes = await authFetch(apiUrl('/api/invoices/stats'), {
         headers: { 'Authorization': `Bearer ${token}` },
       });
 
@@ -88,7 +90,7 @@ const ProfileScreen = ({ navigation }) => {
     setPlaidLoading(true);
     try {
       const token = await getToken();
-      const response = await fetch(apiUrl('/api/plaid/supplier-link-token'), {
+      const response = await authFetch(apiUrl('/api/plaid/supplier-link-token'), {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -108,6 +110,9 @@ const ProfileScreen = ({ navigation }) => {
         Alert.alert('Error', data.error || 'Failed to initialize Plaid');
       }
     } catch (error) {
+      // The 401 handler already sent the user to Login; an alert on top
+      // of the login screen would just be noise.
+      if (isSessionExpired(error)) return;
       Alert.alert('Connection Error', 'Could not connect to Plaid service');
       console.error(error);
     } finally {
@@ -118,7 +123,7 @@ const ProfileScreen = ({ navigation }) => {
   const handleSaveChanges = async () => {
     try {
       const token = await getToken();
-      const response = await fetch(apiUrl('/api/user/profile'), {
+      const response = await authFetch(apiUrl('/api/user/profile'), {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -137,8 +142,43 @@ const ProfileScreen = ({ navigation }) => {
         Alert.alert('Error', 'Failed to update profile');
       }
     } catch (error) {
+      // The 401 handler already sent the user to Login; an alert on top
+      // of the login screen would just be noise.
+      if (isSessionExpired(error)) return;
       Alert.alert('Error', 'Failed to save changes');
     }
+  };
+
+  // Signs out every device by bumping token_version server side. A normal
+  // logout only clears this device's copy; the token stays valid elsewhere
+  // for its full 7 days.
+  const handleLogoutEverywhere = () => {
+    Alert.alert(
+      'Log out of all devices',
+      'Every signed-in device will need to log in again. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Log out everywhere',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const token = await getToken();
+              await fetch(apiUrl('/api/auth/logout-all'), {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+              });
+            } catch (e) {
+              console.error('Logout-all failed:', e);
+            } finally {
+              // Clear locally either way -- the user asked to be signed out.
+              await logout();
+              resetToAuth(navigation);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleLogout = () => {
@@ -266,6 +306,10 @@ const ProfileScreen = ({ navigation }) => {
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
           <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity style={styles.logoutAllButton} onPress={handleLogoutEverywhere}>
+          <Text style={styles.logoutAllText}>Log out of all devices</Text>
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
@@ -345,6 +389,8 @@ const styles = StyleSheet.create({
     marginTop: 40,
   },
   logoutText: { color: '#ffffff', fontSize: 18, fontWeight: '600' },
+  logoutAllButton: { paddingVertical: 14, alignItems: 'center', marginTop: 4 },
+  logoutAllText: { color: '#a1a1aa', fontSize: 15 },
 });
 
 export default ProfileScreen;

@@ -14,8 +14,10 @@ import { useFocusEffect } from '@react-navigation/native';
 import { getToken } from '@veloxpay/auth';
 import { apiUrl } from '../config/api';
 import { resetToAuth } from '../navigation/resetToAuth';
+import { useAuthFetch, isSessionExpired } from '../api/useAuthFetch';
 
 const InvoicesScreen = ({ navigation }) => {
+  const authFetch = useAuthFetch(navigation);
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -40,8 +42,7 @@ const InvoicesScreen = ({ navigation }) => {
         return;
       }
 
-      const response = await fetch(
-        apiUrl(`/api/invoices?page=${currentPage}&limit=${limit}`),
+      const response = await authFetch(apiUrl(`/api/invoices?page=${currentPage}&limit=${limit}`),
         {
           headers: { 'Authorization': `Bearer ${token}` },
         }

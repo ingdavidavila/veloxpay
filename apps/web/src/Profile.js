@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './useAuth';
 import { useRefreshOnFocus } from './useRefreshOnFocus';
+import { useAuthFetch, isSessionExpired } from './useAuthFetch';
 import { usePlaidLink } from 'react-plaid-link';
 
 function Profile() {
@@ -32,6 +33,7 @@ function Profile() {
   // Fetch user data and stats
   // Bumping this re-runs the fetch effect below. The fetch lives inside
   // that effect, so this is the least invasive way to refetch.
+  const authFetch = useAuthFetch();
   const [refreshKey, setRefreshKey] = useState(0);
   useRefreshOnFocus(() => setRefreshKey((k) => k + 1));
 
@@ -49,7 +51,7 @@ function Profile() {
     const fetchStats = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch('http://localhost:5000/api/invoices/stats', {
+        const response = await authFetch('http://localhost:5000/api/invoices/stats', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
 
@@ -69,6 +71,7 @@ function Profile() {
           });
         }
       } catch (error) {
+        if (isSessionExpired(error)) return;
         console.error('Error fetching stats:', error);
       } finally {
         setLoading(false);
@@ -88,7 +91,7 @@ function Profile() {
   const handleSaveChanges = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/user/profile', {
+      const response = await authFetch('http://localhost:5000/api/user/profile', {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -109,6 +112,7 @@ function Profile() {
         alert('Failed to update profile');
       }
     } catch (error) {
+      if (isSessionExpired(error)) return;
       console.error('Error updating profile:', error);
       alert('Error updating profile');
     }
@@ -119,7 +123,7 @@ function Profile() {
     setError(null);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/plaid/supplier-link-token', {
+      const response = await authFetch('http://localhost:5000/api/plaid/supplier-link-token', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -134,6 +138,7 @@ function Profile() {
         setError(data.error || 'Failed to initialize bank connection');
       }
     } catch (err) {
+      if (isSessionExpired(err)) return;
       setError('Network error. Please try again.');
       console.error(err);
     }
@@ -143,7 +148,7 @@ function Profile() {
   const onPlaidSuccess = async (public_token, metadata) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/plaid/supplier-exchange-token', {
+      const response = await authFetch('http://localhost:5000/api/plaid/supplier-exchange-token', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -166,6 +171,7 @@ function Profile() {
         alert('Failed to save bank account. Please try again.');
       }
     } catch (err) {
+      if (isSessionExpired(err)) return;
       console.error(err);
       alert('Something went wrong while saving your bank account.');
     }
@@ -182,6 +188,30 @@ function Profile() {
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  // Signs out every device by bumping the account's token_version server
+  // side. Normal logout only deletes this browser's copy of the token --
+  // it stays valid elsewhere for its full 7 days.
+  const handleLogoutEverywhere = async () => {
+    if (!window.confirm('Sign out of all devices? You will need to log in again everywhere.')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      await fetch('http://localhost:5000/api/auth/logout-all', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+    } catch (err) {
+      console.error('Logout-all failed:', err);
+    } finally {
+      // Clear locally either way: if the call succeeded this token is dead,
+      // and if it failed the user still asked to be signed out here.
+      logout();
+      navigate('/login', { replace: true });
+    }
   };
 
   if (loading) return <p>Loading profile...</p>;
@@ -363,6 +393,14 @@ function Profile() {
         {/* Logout Button */}
         <button className="logout-btn" onClick={handleLogout}>
           <i className="bi bi-box-arrow-right"></i> Log Out
+        </button>
+
+        <button
+          className="btn-cancel"
+          onClick={handleLogoutEverywhere}
+          style={{ marginTop: '8px', width: '100%' }}
+        >
+          Log out of all devices
         </button>
       </div>
     </main>
