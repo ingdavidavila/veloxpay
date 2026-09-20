@@ -19,6 +19,74 @@ function Upload() {
     termDays: '30'
   });
 
+  // --- Add Client dialog -------------------------------------------------
+  const [showClientModal, setShowClientModal] = useState(false);
+  const [savingClient, setSavingClient] = useState(false);
+  const [clientError, setClientError] = useState('');
+  const [clientToast, setClientToast] = useState('');
+  const [newClient, setNewClient] = useState({
+    name: '',
+    duns_number: '',
+    contact_name: '',
+    email: '',
+    address: ''
+  });
+
+  const handleNewClientChange = (e) => {
+    const { name, value } = e.target;
+    setNewClient((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const closeClientModal = () => {
+    setShowClientModal(false);
+    setClientError('');
+    setNewClient({ name: '', duns_number: '', contact_name: '', email: '', address: '' });
+  };
+
+  const handleCreateClient = async (e) => {
+    e.preventDefault();
+    setClientError('');
+
+    if (!newClient.name.trim()) {
+      setClientError('Company name is required.');
+      return;
+    }
+
+    setSavingClient(true);
+    try {
+      const response = await fetch('http://localhost:5000/api/invoices/clients', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(newClient)
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setClientError(data.error || 'Could not add client.');
+        return;
+      }
+
+      // Add to the dropdown and select it straight away, so the user lands
+      // back on the invoice form with the client they just created chosen.
+      setClients((prev) =>
+        [...prev, data.client].sort((a, b) => a.name.localeCompare(b.name))
+      );
+      setInvoiceData((prev) => ({ ...prev, clientId: data.client.id }));
+      closeClientModal();
+      setClientToast(`${data.client.name} added`);
+      setTimeout(() => setClientToast(''), 4000);
+    } catch (err) {
+      console.error('Error creating client:', err);
+      setClientError('Network error. Please try again.');
+    } finally {
+      setSavingClient(false);
+    }
+  };
+
   // Fetch clients
   useEffect(() => {
     const fetchClients = async () => {
@@ -250,14 +318,40 @@ function Upload() {
               <select
                 name="clientId"
                 value={invoiceData.clientId}
-                onChange={handleInputChange}
+                onChange={(e) => {
+                  // The sentinel value opens the dialog instead of selecting.
+                  // Using an <option> keeps "add" where the user is already
+                  // looking, rather than hiding it in a separate button.
+                  if (e.target.value === '__add__') {
+                    setShowClientModal(true);
+                    return;
+                  }
+                  handleInputChange(e);
+                }}
                 required
               >
                 <option value="">Select a client</option>
                 {clients.map(c => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
+                <option value="__add__">+ Add new client…</option>
               </select>
+
+              {clientToast && (
+                <div
+                  role="status"
+                  style={{
+                    marginTop: '8px',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    background: '#e8f7ee',
+                    color: '#1e7e34',
+                    fontSize: '14px'
+                  }}
+                >
+                  ✓ {clientToast}
+                </div>
+              )}
             </div>
 
             <div className="form-group">
@@ -290,6 +384,111 @@ function Upload() {
             </button>
           </div>
         </form>
+
+        {/* Add Client dialog. Rendered outside the invoice <form> because
+            nesting a form inside a form is invalid HTML -- the inner submit
+            would submit the outer one and try to upload the invoice. */}
+        {showClientModal && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Add new client"
+            onClick={closeClientModal}
+            style={{
+              position: 'fixed', inset: 0, zIndex: 1000,
+              background: 'rgba(0,0,0,0.5)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: '16px'
+            }}
+          >
+            {/* stopPropagation so clicking inside the card doesn't close it */}
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: '#fff', borderRadius: '10px', padding: '24px',
+                width: '100%', maxWidth: '460px',
+                maxHeight: '90vh', overflowY: 'auto',
+                boxShadow: '0 10px 40px rgba(0,0,0,0.25)'
+              }}
+            >
+              <h3 style={{ margin: '0 0 4px' }}>Add New Client</h3>
+              <p style={{ margin: '0 0 16px', color: '#666', fontSize: '14px' }}>
+                Only the company name is required.
+              </p>
+
+              {clientError && (
+                <div className="alert alert-danger mb-4" role="alert">{clientError}</div>
+              )}
+
+              <form onSubmit={handleCreateClient}>
+                <div className="form-group">
+                  <label>Company Name *</label>
+                  <input
+                    type="text" name="name" value={newClient.name}
+                    onChange={handleNewClientChange}
+                    placeholder="Rio Grande Produce LLC" autoFocus
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>DUNS Number</label>
+                  <input
+                    type="text" name="duns_number" value={newClient.duns_number}
+                    onChange={handleNewClientChange}
+                    placeholder="12-345-6789"
+                    inputMode="numeric"
+                  />
+                  <small style={{ color: '#666' }}>
+                    9 digits. Dashes are fine — they’re stripped automatically.
+                  </small>
+                </div>
+
+                <div className="form-group">
+                  <label>Contact Name</label>
+                  <input
+                    type="text" name="contact_name" value={newClient.contact_name}
+                    onChange={handleNewClientChange}
+                    placeholder="Maria Santos"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Contact Email</label>
+                  <input
+                    type="email" name="email" value={newClient.email}
+                    onChange={handleNewClientChange}
+                    placeholder="maria@rgproduce.com"
+                  />
+                  <small style={{ color: '#666' }}>
+                    Invoice approval requests are sent here.
+                  </small>
+                </div>
+
+                <div className="form-group">
+                  <label>Address</label>
+                  <textarea
+                    name="address" value={newClient.address}
+                    onChange={handleNewClientChange}
+                    placeholder="1200 N 10th St, McAllen, TX 78501"
+                    rows="2"
+                  />
+                </div>
+
+                <div className="form-actions">
+                  <button
+                    type="button" className="btn-cancel"
+                    onClick={closeClientModal} disabled={savingClient}
+                  >
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn-submit" disabled={savingClient}>
+                    {savingClient ? 'Saving…' : 'Save Client'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </main>
   );

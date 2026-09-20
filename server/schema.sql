@@ -70,13 +70,27 @@ CREATE INDEX IF NOT EXISTS idx_suppliers_user_id ON suppliers (user_id);
 -- ============================================================
 -- The invoice "client". Exposed by GET /api/invoices/clients, which
 -- selects id, name, email, phone.
+-- supplier_id scopes a client to whoever created it. Without it every
+-- supplier sees every other supplier's client book, DUNS numbers included.
 CREATE TABLE IF NOT EXISTS customers (
-  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name       VARCHAR(255) NOT NULL,
-  email      VARCHAR(255),
-  phone      VARCHAR(50),
-  created_at TIMESTAMP DEFAULT NOW()
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  supplier_id  UUID REFERENCES suppliers(id) ON DELETE CASCADE,
+  name         VARCHAR(255) NOT NULL,
+  duns_number  VARCHAR(20),
+  contact_name VARCHAR(255),
+  email        VARCHAR(255),
+  phone        VARCHAR(50),
+  address      TEXT,
+  created_at   TIMESTAMP DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_customers_supplier_id ON customers (supplier_id);
+
+-- DUNS is unique within one supplier's book, not globally: two suppliers may
+-- legitimately both invoice the same buyer. Partial index so the many rows
+-- without a DUNS don't collide.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_supplier_duns
+  ON customers (supplier_id, duns_number) WHERE duns_number IS NOT NULL;
 
 
 -- ============================================================
@@ -120,6 +134,17 @@ CREATE INDEX IF NOT EXISTS idx_invoices_status         ON invoices (status);
 CREATE INDEX IF NOT EXISTS idx_invoices_due_date       ON invoices (due_date);
 -- The approval flow looks invoices up by number, not id.
 CREATE INDEX IF NOT EXISTS idx_invoices_invoice_number ON invoices (invoice_number);
+
+
+-- ============================================================
+-- Upgrades for databases created before a column existed
+-- ============================================================
+-- CREATE TABLE IF NOT EXISTS does nothing when the table already exists, so
+-- new columns need explicit ALTERs. All are idempotent and safe to re-run.
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS supplier_id  UUID REFERENCES suppliers(id) ON DELETE CASCADE;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS duns_number  VARCHAR(20);
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS contact_name VARCHAR(255);
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS address      TEXT;
 
 
 -- ============================================================

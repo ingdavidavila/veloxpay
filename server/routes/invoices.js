@@ -298,25 +298,102 @@ router.post('/:identifier/client-decision', async (req, res) => {
 });
 
 // ====================== GET CLIENTS FOR DROPDOWN ======================
-// Returns all customers (simple version - no supplier filter yet)
+// Scoped to the calling supplier. This previously returned every customer
+// row in the database to every supplier, which leaked one supplier's client
+// book -- names, contacts and DUNS numbers -- to all the others.
 router.get('/clients', authenticateToken, async (req, res) => {
   try {
+    const supplierId = req.user?.supplierId;
+
+    if (!supplierId) {
+      return res.status(401).json({ error: 'Supplier ID not found in token. Please log in again.' });
+    }
+
     const query = `
-      SELECT 
+      SELECT
         id,
         name,
+        duns_number,
+        contact_name,
         email,
-        phone
-      FROM customers 
+        phone,
+        address
+      FROM customers
+      WHERE supplier_id = $1
       ORDER BY name ASC;
     `;
 
-    const result = await pool.query(query);
+    const result = await pool.query(query, [supplierId]);
 
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching clients:', error);
     res.status(500).json({ error: 'Failed to fetch clients' });
+  }
+});
+
+// ====================== CREATE CLIENT ======================
+// POST /api/invoices/clients
+// Backs the "Add New Client" dialog on the upload screens.
+router.post('/clients', authenticateToken, async (req, res) => {
+  try {
+    const supplierId = req.user?.supplierId;
+
+    if (!supplierId) {
+      return res.status(401).json({ error: 'Supplier ID not found in token. Please log in again.' });
+    }
+
+    const { name, duns_number, contact_name, email, phone, address } = req.body;
+
+    if (!name || !String(name).trim()) {
+      return res.status(400).json({ error: 'Company name is required' });
+    }
+
+    // D&B numbers are exactly 9 digits. Accept the dashed form people copy
+    // from documents (12-345-6789) by stripping non-digits first.
+    let duns = null;
+    if (duns_number && String(duns_number).trim()) {
+      duns = String(duns_number).replace(/\D/g, '');
+      if (duns.length !== 9) {
+        return res.status(400).json({ error: 'DUNS number must be 9 digits' });
+      }
+    }
+
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim())) {
+      return res.status(400).json({ error: 'Please enter a valid email address' });
+    }
+
+    const result = await pool.query(
+      `
+      INSERT INTO customers (supplier_id, name, duns_number, contact_name, email, phone, address)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING id, name, duns_number, contact_name, email, phone, address
+      `,
+      [
+        supplierId,
+        String(name).trim(),
+        duns,
+        contact_name?.trim() || null,
+        email?.trim() || null,
+        phone?.trim() || null,
+        address?.trim() || null,
+      ]
+    );
+
+    res.status(201).json({ message: 'Client added successfully', client: result.rows[0] });
+  } catch (error) {
+    // Partial unique index on (supplier_id, duns_number).
+    if (error.code === '23505') {
+      return res.status(409).json({ error: 'You already have a client with that DUNS number' });
+    }
+    // The JWT stays valid for 7 days, so it can outlive the supplier row it
+    // names (deleted account). That is an auth problem, not a server fault --
+    // answer 401 so the client sends the user back to login.
+    if (error.code === '23503') {
+      return res.status(401).json({ error: 'Your session is no longer valid. Please log in again.' });
+    }
+    console.error('Error creating client:', error);
+    res.status(500).json({ error: 'Failed to create client' });
   }
 });
 

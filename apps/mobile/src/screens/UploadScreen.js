@@ -10,6 +10,9 @@ import {
   ActivityIndicator,
   StyleSheet,
   Image,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -27,6 +30,74 @@ const UploadScreen = ({ navigation }) => {
   const [selectedImage, setSelectedImage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showTermDropdown, setShowTermDropdown] = useState(false);
+
+  // --- Client picker + Add Client dialog ---------------------------------
+  const [clients, setClients] = useState([]);
+  const [showClientDropdown, setShowClientDropdown] = useState(false);
+  const [showClientModal, setShowClientModal] = useState(false);
+  const [savingClient, setSavingClient] = useState(false);
+  const [newClient, setNewClient] = useState({
+    name: '', duns_number: '', contact_name: '', email: '', address: ''
+  });
+
+  const fetchClients = async () => {
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const res = await fetch(apiUrl('/api/invoices/clients'), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) setClients(await res.json());
+    } catch (e) {
+      console.error('Error fetching clients:', e);
+    }
+  };
+
+  useEffect(() => {
+    fetchClients();
+  }, []);
+
+  const handleCreateClient = async () => {
+    if (!newClient.name.trim()) {
+      Alert.alert('Error', 'Company name is required');
+      return;
+    }
+
+    setSavingClient(true);
+    try {
+      const token = await getToken();
+      const res = await fetch(apiUrl('/api/invoices/clients'), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newClient),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        Alert.alert('Could not add client', data.error || 'Please try again.');
+        return;
+      }
+
+      // Select the new client immediately so the user returns to a filled form.
+      setClients((prev) =>
+        [...prev, data.client].sort((a, b) => a.name.localeCompare(b.name))
+      );
+      setCustomerId(data.client.id);
+      setCustomerName(data.client.name);
+      setShowClientModal(false);
+      setNewClient({ name: '', duns_number: '', contact_name: '', email: '', address: '' });
+      Alert.alert('✅ Client added', `${data.client.name} is now selected.`);
+    } catch (e) {
+      Alert.alert('Connection Error', 'Cannot reach the server. Is the backend running?');
+      console.error(e);
+    } finally {
+      setSavingClient(false);
+    }
+  };
 
   const termOptions = [
     { label: '30 Days', value: '30' },
@@ -212,21 +283,52 @@ const UploadScreen = ({ navigation }) => {
             editable={false}   // User cannot manually edit due date
           />
 
-          <Text style={styles.label}>Customer ID *</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Customer ID"
-            value={customerId}
-            onChangeText={setCustomerId}
-          />
+          {/* Was a free-text field for a raw UUID, which nobody can type from
+              memory. Now a picker over the supplier's own clients, with an
+              inline "add" entry so a new buyer can be created without
+              leaving the invoice. */}
+          <Text style={styles.label}>Client / Buyer *</Text>
+          <TouchableOpacity
+            style={styles.dropdownButton}
+            onPress={() => setShowClientDropdown(!showClientDropdown)}
+          >
+            <Text style={styles.dropdownText}>
+              {customerName || 'Select a client'}
+            </Text>
+          </TouchableOpacity>
 
-          <Text style={styles.label}>Customer Name (optional)</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Client Company Name"
-            value={customerName}
-            onChangeText={setCustomerName}
-          />
+          {showClientDropdown && (
+            <View style={styles.dropdownMenu}>
+              {clients.map((c) => (
+                <TouchableOpacity
+                  key={c.id}
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    setCustomerId(c.id);
+                    setCustomerName(c.name);
+                    setShowClientDropdown(false);
+                  }}
+                >
+                  <Text style={styles.dropdownItemText}>{c.name}</Text>
+                  {!!c.duns_number && (
+                    <Text style={styles.dropdownItemSub}>DUNS {c.duns_number}</Text>
+                  )}
+                </TouchableOpacity>
+              ))}
+
+              <TouchableOpacity
+                style={styles.dropdownItem}
+                onPress={() => {
+                  setShowClientDropdown(false);
+                  setShowClientModal(true);
+                }}
+              >
+                <Text style={[styles.dropdownItemText, { color: '#d4af37' }]}>
+                  + Add new client…
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* Image Selection */}
           <Text style={styles.label}>Invoice Photo *</Text>
@@ -261,6 +363,100 @@ const UploadScreen = ({ navigation }) => {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Add Client dialog */}
+      <Modal
+        visible={showClientModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowClientModal(false)}
+      >
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View style={styles.modalCard}>
+            {/* keyboardShouldPersistTaps so Save registers on the first tap
+                while the keyboard is still open, instead of being eaten by
+                the dismiss. */}
+            <ScrollView keyboardShouldPersistTaps="handled">
+              <Text style={styles.modalTitle}>Add New Client</Text>
+              <Text style={styles.modalSubtitle}>Only the company name is required.</Text>
+
+              <Text style={styles.label}>Company Name *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Rio Grande Produce LLC"
+                placeholderTextColor="#71717a"
+                value={newClient.name}
+                onChangeText={(v) => setNewClient((p) => ({ ...p, name: v }))}
+              />
+
+              <Text style={styles.label}>DUNS Number</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="12-345-6789"
+                placeholderTextColor="#71717a"
+                keyboardType="number-pad"
+                value={newClient.duns_number}
+                onChangeText={(v) => setNewClient((p) => ({ ...p, duns_number: v }))}
+              />
+              <Text style={styles.helpText}>9 digits. Dashes are stripped automatically.</Text>
+
+              <Text style={styles.label}>Contact Name</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Maria Santos"
+                placeholderTextColor="#71717a"
+                value={newClient.contact_name}
+                onChangeText={(v) => setNewClient((p) => ({ ...p, contact_name: v }))}
+              />
+
+              <Text style={styles.label}>Contact Email</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="maria@rgproduce.com"
+                placeholderTextColor="#71717a"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                value={newClient.email}
+                onChangeText={(v) => setNewClient((p) => ({ ...p, email: v }))}
+              />
+              <Text style={styles.helpText}>Invoice approval requests are sent here.</Text>
+
+              <Text style={styles.label}>Address</Text>
+              <TextInput
+                style={[styles.input, { height: 72, textAlignVertical: 'top' }]}
+                placeholder="1200 N 10th St, McAllen, TX 78501"
+                placeholderTextColor="#71717a"
+                multiline
+                value={newClient.address}
+                onChangeText={(v) => setNewClient((p) => ({ ...p, address: v }))}
+              />
+
+              <TouchableOpacity
+                style={styles.uploadButton}
+                onPress={handleCreateClient}
+                disabled={savingClient}
+              >
+                {savingClient ? (
+                  <ActivityIndicator color="#ffffff" />
+                ) : (
+                  <Text style={styles.uploadButtonText}>Save Client</Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.modalCancel}
+                onPress={() => setShowClientModal(false)}
+                disabled={savingClient}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -307,6 +503,27 @@ const styles = StyleSheet.create({
     borderBottomColor: '#27272a',
   },
   dropdownItemText: { color: '#ffffff', fontSize: 16 },
+  dropdownItemSub: { color: '#a1a1aa', fontSize: 13, marginTop: 2 },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    backgroundColor: '#0a0f0a',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 24,
+    maxHeight: '90%',
+    borderTopWidth: 1,
+    borderColor: '#27272a',
+  },
+  modalTitle: { fontSize: 24, fontWeight: 'bold', color: '#ffffff', marginBottom: 4 },
+  modalSubtitle: { fontSize: 14, color: '#a1a1aa', marginBottom: 20 },
+  helpText: { color: '#71717a', fontSize: 12, marginTop: -8, marginBottom: 12 },
+  modalCancel: { paddingVertical: 14, alignItems: 'center', marginBottom: 12 },
+  modalCancelText: { color: '#a1a1aa', fontSize: 16 },
 
   imageOptions: {
     flexDirection: 'row',
