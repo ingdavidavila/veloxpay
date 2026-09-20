@@ -19,6 +19,28 @@ const { findOrCreateSocialUser } = require("../utils/socialAuth");
 
 const router = express.Router();
 
+// Mint an auth token carrying the user's current token_version, so it can be
+// revoked later by bumping that column. Reads the version itself rather than
+// trusting each call site to have selected it -- four call sites had already
+// drifted apart in what they loaded.
+const signAuthToken = async (userId, supplierId) => {
+  const result = await pool.query(
+    "SELECT token_version FROM users WHERE id = $1",
+    [userId]
+  );
+
+  return jwt.sign(
+    {
+      userId,
+      supplierId,
+      tokenVersion: result.rows[0]?.token_version ?? 0,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: "7d" }
+  );
+};
+
+
 // ======================
 // SIGNUP
 // ======================
@@ -47,14 +69,7 @@ const handleSignup = async (req, res) => {
       VALUES ($1, $2, $3, $4, $5, NOW())
     `, [supplierId, newUser.id, newUser.name, newUser.business_name || newUser.name, newUser.email]);
 
-    const token = jwt.sign(
-      { 
-        userId: newUser.id,
-        supplierId: supplierId 
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    const token = await signAuthToken(newUser.id, supplierId);
 
     res.status(201).json({
       message: "User created successfully",
@@ -132,14 +147,7 @@ const handleLogin = async (req, res) => {
     }
 
     // Create JWT with both userId and supplierId
-    const token = jwt.sign(
-      { 
-        userId: user.id,
-        supplierId: supplierId 
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    const token = await signAuthToken(user.id, supplierId);
 
     res.json({
       message: "Login successful",
@@ -250,8 +258,16 @@ router.post("/reset-password", async (req, res) => {
 
     const newPasswordHash = await bcrypt.hash(newPassword, 10);
 
+    // Bumping token_version signs out every existing session. A password
+    // reset is usually a response to a compromise, so leaving the old
+    // tokens working for another 7 days would defeat the point of it.
     await pool.query(
-      "UPDATE users SET password_hash = $1, reset_token = NULL, reset_token_expiry = NULL WHERE id = $2",
+      `UPDATE users
+         SET password_hash = $1,
+             reset_token = NULL,
+             reset_token_expiry = NULL,
+             token_version = token_version + 1
+       WHERE id = $2`,
       [newPasswordHash, userId]
     );
 
@@ -307,14 +323,7 @@ router.post("/google", async (req, res) => {
       supplierId = supplierCheck.rows[0].id;
     }
 
-    const token = jwt.sign(
-      { 
-        userId: result.user.id,
-        supplierId: supplierId 
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    const token = await signAuthToken(result.user.id, supplierId);
 
     res.json({
       message: "Google login successful",
@@ -366,14 +375,7 @@ router.post("/auth/apple", async (req, res) => {
       supplierId = supplierCheck.rows[0].id;
     }
 
-    const token = jwt.sign(
-      { 
-        userId: result.user.id,
-        supplierId: supplierId 
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    const token = await signAuthToken(result.user.id, supplierId);
 
     res.json({
       message: "Apple login successful",
@@ -388,6 +390,42 @@ router.post("/auth/apple", async (req, res) => {
   } catch (error) {
     console.error("Apple login error:", error);
     res.status(500).json({ error: "Apple login failed" });
+  }
+});
+
+// ======================
+// LOG OUT EVERYWHERE
+// ======================
+// POST /api/auth/logout-all
+// Clients delete their own copy of the token on a normal logout, which is
+// enough for that device. This is for the case that actually needs the
+// server: a lost or stolen phone, or a session the user no longer trusts.
+// Bumping token_version invalidates every token already issued, including
+// the one making this call.
+router.post("/auth/logout-all", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      return res.status(401).json({ error: "User ID not found in token. Please log in again." });
+    }
+
+    const result = await pool.query(
+      "UPDATE users SET token_version = token_version + 1 WHERE id = $1 RETURNING token_version",
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({
+      message: "Signed out of all devices. Please log in again.",
+      token_version: result.rows[0].token_version,
+    });
+  } catch (error) {
+    console.error("Logout-all error:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 

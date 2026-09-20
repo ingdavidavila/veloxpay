@@ -34,6 +34,10 @@ CREATE TABLE IF NOT EXISTS users (
   avatar             TEXT,
   reset_token        VARCHAR(255),
   reset_token_expiry TIMESTAMP,
+  -- Bumped to invalidate every token already issued for this user: "log out
+  -- everywhere", and automatically on password reset. Tokens carry the value
+  -- they were minted with; the middleware rejects any that no longer match.
+  token_version      INTEGER NOT NULL DEFAULT 0,
   created_at         TIMESTAMP DEFAULT NOW(),
   updated_at         TIMESTAMP DEFAULT NOW()
 );
@@ -148,6 +152,7 @@ ALTER TABLE customers ADD COLUMN IF NOT EXISTS supplier_id  UUID REFERENCES supp
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS duns_number  VARCHAR(20);
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS contact_name VARCHAR(255);
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS address      TEXT;
+ALTER TABLE users     ADD COLUMN IF NOT EXISTS token_version INTEGER NOT NULL DEFAULT 0;
 
 -- invoice_number used to be globally unique, which stopped a second supplier
 -- from ever using a number a first supplier had already used.
