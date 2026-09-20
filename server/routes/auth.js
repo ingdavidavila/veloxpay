@@ -393,6 +393,19 @@ router.post("/auth/apple", async (req, res) => {
   }
 });
 
+// Shared shape for the profile record, so a 409 hands back exactly what a
+// fresh read would and the client can show the user what it actually is now.
+const fetchProfileRow = async (userId) => {
+  const result = await pool.query(
+    `SELECT id, name, business_name, email, phone_number AS phone,
+            avatar, created_at, updated_at
+       FROM users
+      WHERE id = $1`,
+    [userId]
+  );
+  return result.rows[0] ?? null;
+};
+
 // ======================
 // LOG OUT EVERYWHERE
 // ======================
@@ -458,6 +471,9 @@ const handleMe = async (req, res) => {
         u.phone_number AS phone,
         u.avatar,
         u.created_at,
+        -- Clients send this back on a profile update so the server can reject
+        -- a write based on a copy of the record that is already out of date.
+        u.updated_at,
         s.id AS supplier_id,
         COALESCE(s.bank_connected, FALSE) AS has_bank_account
       FROM users u
@@ -502,9 +518,46 @@ router.put("/user/profile", authenticateToken, async (req, res) => {
       return res.status(401).json({ error: "User ID not found in token. Please log in again." });
     }
 
-    const { business_name, phone, name } = req.body;
+    const { business_name, phone, name, updated_at } = req.body;
 
     await client.query("BEGIN");
+
+    // Optimistic concurrency. updated_at is the version the client last read
+    // (from /api/auth/me or a previous save). Conditioning the write on it
+    // means two devices editing the same profile can no longer silently
+    // overwrite each other -- the second one is told its copy is stale.
+    //
+    // Enforced only when the client sends it, so an older client keeps
+    // working rather than being locked out by a deploy. Both of ours send it.
+    if (updated_at) {
+      const expected = new Date(updated_at);
+
+      if (Number.isNaN(expected.getTime())) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({ error: "updated_at is not a valid timestamp" });
+      }
+
+      const current = await client.query(
+        "SELECT updated_at FROM users WHERE id = $1",
+        [userId]
+      );
+
+      if (current.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Compare instants, not strings: the client round-trips this through
+      // JSON, so the formatting will not match character for character.
+      if (current.rows[0].updated_at.getTime() !== expected.getTime()) {
+        await client.query("ROLLBACK");
+        return res.status(409).json({
+          error:
+            "This profile was changed on another device. Review the current details and try again.",
+          current: await fetchProfileRow(userId),
+        });
+      }
+    }
 
     // COALESCE($n, column) leaves a field untouched when the client omits it,
     // so a partial update cannot blank out the other fields.

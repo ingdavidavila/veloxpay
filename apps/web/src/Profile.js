@@ -18,6 +18,10 @@ function Profile() {
   // call threw "setError is not a function". The state name was missing.
   const [error, setError] = useState(null);
 
+  // The updated_at we last read, sent back on save so the server can refuse
+  // a write built on a copy another device has already superseded.
+  const [profileVersion, setProfileVersion] = useState(null);
+
   const [profileData, setProfileData] = useState({
     businessName: '',
     email: '',
@@ -47,6 +51,29 @@ function Profile() {
 
       setBankConnected(!!user.supplier_plaid_access_token || !!user.has_bank_account);
     }
+
+    const fetchProfile = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await authFetch('http://localhost:5000/api/auth/me', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setProfileData({
+            businessName: data.business_name || data.name || '',
+            email: data.email || '',
+            phone: data.phone || '',
+          });
+          setProfileVersion(data.updated_at ?? null);
+          setBankConnected(!!data.has_bank_account);
+        }
+      } catch (error) {
+        if (isSessionExpired(error)) return;
+        console.error('Error fetching profile:', error);
+      }
+    };
 
     const fetchStats = async () => {
       try {
@@ -79,6 +106,7 @@ function Profile() {
     };
 
     if (user?.id) {
+      fetchProfile();
       fetchStats();
     }
   }, [user, refreshKey]);
@@ -100,16 +128,35 @@ function Profile() {
         body: JSON.stringify({
           business_name: profileData.businessName,
           phone: profileData.phone,
+          updated_at: profileVersion,
         })
       });
 
+      const data = await response.json().catch(() => ({}));
+
       if (response.ok) {
-        const updatedData = await response.json();
-        updateUser(updatedData.user);
+        updateUser(data.user);
+        // Adopt the new version so a second save this session is not rejected
+        // for carrying the one we read on load.
+        setProfileVersion(data.user?.updated_at ?? null);
         setIsEditing(false);
         alert('Profile updated successfully');
+      } else if (response.status === 409) {
+        // Changed elsewhere first. Show what it is now and take that version,
+        // so the user can decide rather than silently overwriting the other
+        // device's edit.
+        if (data.current) {
+          setProfileData({
+            businessName: data.current.business_name || data.current.name || '',
+            email: data.current.email || '',
+            phone: data.current.phone || '',
+          });
+          setProfileVersion(data.current.updated_at ?? null);
+        }
+        setIsEditing(false);
+        alert(data.error || 'This profile was changed on another device. Your changes were not saved.');
       } else {
-        alert('Failed to update profile');
+        alert(data.error || 'Failed to update profile');
       }
     } catch (error) {
       if (isSessionExpired(error)) return;

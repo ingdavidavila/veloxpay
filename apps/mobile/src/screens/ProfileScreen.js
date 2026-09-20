@@ -24,6 +24,10 @@ const ProfileScreen = ({ navigation }) => {
   const [bankConnected, setBankConnected] = useState(false);
   const [plaidLoading, setPlaidLoading] = useState(false);
 
+  // The updated_at we last read. Sent back on save so the server can refuse
+  // a write built on a copy another device has already superseded.
+  const [profileVersion, setProfileVersion] = useState(null);
+
   const [profileData, setProfileData] = useState({
     businessName: '',
     email: '',
@@ -62,6 +66,7 @@ const ProfileScreen = ({ navigation }) => {
           email: userData.email || '',
           phone: userData.phone || '',
         });
+        setProfileVersion(userData.updated_at ?? null);
         setBankConnected(!!userData.supplier_plaid_access_token || !!userData.has_bank_account);
       }
 
@@ -132,14 +137,37 @@ const ProfileScreen = ({ navigation }) => {
         body: JSON.stringify({
           business_name: profileData.businessName,
           phone: profileData.phone,
+          updated_at: profileVersion,
         }),
       });
 
+      const data = await response.json().catch(() => ({}));
+
       if (response.ok) {
+        // Keep the new version so a second save in the same session is not
+        // rejected for carrying the one we read on load.
+        setProfileVersion(data.user?.updated_at ?? null);
         Alert.alert('Success', 'Profile updated successfully');
         setIsEditing(false);
+      } else if (response.status === 409) {
+        // Someone else changed this profile first. Show what it is now and
+        // adopt that version, so the user can decide and retry rather than
+        // silently clobbering the other device's edit.
+        if (data.current) {
+          setProfileData({
+            businessName: data.current.business_name || data.current.name || '',
+            email: data.current.email || '',
+            phone: data.current.phone || '',
+          });
+          setProfileVersion(data.current.updated_at ?? null);
+        }
+        setIsEditing(false);
+        Alert.alert(
+          'Changed on another device',
+          data.error || 'This profile was updated elsewhere. Your changes were not saved.'
+        );
       } else {
-        Alert.alert('Error', 'Failed to update profile');
+        Alert.alert('Error', data.error || 'Failed to update profile');
       }
     } catch (error) {
       // The 401 handler already sent the user to Login; an alert on top
