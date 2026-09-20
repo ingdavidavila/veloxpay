@@ -55,4 +55,5 @@ echo "=== users columns ==="
 "$PSQL" -d "$DB_NAME" -c '\d users'
 
 echo
-echo "🎉 Done. Restart the server (npm run server) and try Create Account."
+echo "🎉 Database '$DB_NAME' is ready and the schema is up to date."
+echo "   Start the API with:  npm run server"
