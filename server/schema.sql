@@ -107,7 +107,10 @@ CREATE TABLE IF NOT EXISTS invoices (
   id                           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   supplier_id                  UUID REFERENCES suppliers(id) ON DELETE CASCADE,
   customer_id                  UUID REFERENCES customers(id) ON DELETE SET NULL,
-  invoice_number               VARCHAR(50) UNIQUE NOT NULL,
+  -- NOT globally unique: every business numbers its invoices from 1, so two
+  -- suppliers will both have an INV-001. Uniqueness is per supplier (index
+  -- below). Public approval links use the id, never this.
+  invoice_number               VARCHAR(50) NOT NULL,
   description                  TEXT,
   status                       VARCHAR(20) NOT NULL DEFAULT 'pending'
                                  CHECK (status IN ('pending','approved','paid','rejected','cancelled')),
@@ -132,8 +135,8 @@ CREATE INDEX IF NOT EXISTS idx_invoices_supplier_id    ON invoices (supplier_id)
 CREATE INDEX IF NOT EXISTS idx_invoices_customer_id    ON invoices (customer_id);
 CREATE INDEX IF NOT EXISTS idx_invoices_status         ON invoices (status);
 CREATE INDEX IF NOT EXISTS idx_invoices_due_date       ON invoices (due_date);
--- The approval flow looks invoices up by number, not id.
-CREATE INDEX IF NOT EXISTS idx_invoices_invoice_number ON invoices (invoice_number);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_invoices_supplier_invoice_number
+  ON invoices (supplier_id, invoice_number);
 
 
 -- ============================================================
@@ -145,6 +148,12 @@ ALTER TABLE customers ADD COLUMN IF NOT EXISTS supplier_id  UUID REFERENCES supp
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS duns_number  VARCHAR(20);
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS contact_name VARCHAR(255);
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS address      TEXT;
+
+-- invoice_number used to be globally unique, which stopped a second supplier
+-- from ever using a number a first supplier had already used.
+ALTER TABLE invoices DROP CONSTRAINT IF EXISTS invoices_invoice_number_key;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_invoices_supplier_invoice_number
+  ON invoices (supplier_id, invoice_number);
 
 
 -- ============================================================

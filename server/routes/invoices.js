@@ -9,6 +9,11 @@ const authenticateToken = require('../middleware/auth.js');
 const pool = require('../db');
 const { triggerAdvanceAfterApproval } = require('../utils/invoiceService');
 
+// Public invoice routes accept an id and nothing else. Validating the shape
+// up front means a non-UUID never reaches Postgres, which would otherwise
+// raise 22P02 (invalid input syntax for type uuid) and surface as a 500.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // ====================== MULTER SETUP FOR FILE UPLOAD ======================
 const uploadDir = path.join(__dirname, '../uploads/invoices');
 if (!fs.existsSync(uploadDir)) {
@@ -132,7 +137,17 @@ router.post('/upload', authenticateToken, upload.single('file'), async (req, res
       try { fs.unlinkSync(req.file.path); } catch (e) { console.error("File cleanup failed:", e); }
     }
 
-    res.status(500).json({ error: error.message || "Failed to upload invoice" });
+    // Unique violation on (supplier_id, invoice_number): the supplier has
+    // already used this number. That is the caller's mistake, not a fault.
+    if (error.code === '23505') {
+      return res.status(409).json({
+        error: "You already have an invoice with that number. Use a different invoice number.",
+      });
+    }
+
+    // Don't echo error.message: it leaks Postgres constraint names and query
+    // internals to the client.
+    res.status(500).json({ error: "Failed to upload invoice" });
   }
 });
 
@@ -227,10 +242,14 @@ router.get('/:identifier/public', async (req, res) => {
   const identifier = req.params.identifier;
 
   try {
-    const isUUID = identifier.length > 30 && identifier.includes('-');
-    const query = isUUID 
-      ? "SELECT i.*, c.name as client_name, s.business_name FROM invoices i LEFT JOIN customers c ON c.id = i.customer_id LEFT JOIN suppliers s ON s.id = i.supplier_id WHERE i.id = $1"
-      : "SELECT i.*, c.name as client_name, s.business_name FROM invoices i LEFT JOIN customers c ON c.id = i.customer_id LEFT JOIN suppliers s ON s.id = i.supplier_id WHERE i.invoice_number = $1";
+    // Look up by id only. invoice_number is unique per supplier, not globally,
+    // so matching on it here could serve one supplier's invoice to another's
+    // client -- and sequential numbers would be trivially enumerable.
+    if (!UUID_RE.test(identifier)) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+
+    const query = "SELECT i.*, c.name as client_name, s.business_name FROM invoices i LEFT JOIN customers c ON c.id = i.customer_id LEFT JOIN suppliers s ON s.id = i.supplier_id WHERE i.id = $1";
 
     const result = await pool.query(query, [identifier]);
 
@@ -255,11 +274,13 @@ router.post('/:identifier/client-decision', async (req, res) => {
       return res.status(400).json({ error: 'Invalid decision' });
     }
 
-    const findQuery = identifier.includes('-') && identifier.length > 30 
-      ? "SELECT id FROM invoices WHERE id = $1" 
-      : "SELECT id FROM invoices WHERE invoice_number = $1";
+    // Same reasoning as /:identifier/public -- approving by invoice_number
+    // could act on a different supplier's invoice entirely.
+    if (!UUID_RE.test(identifier)) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
 
-    const findResult = await pool.query(findQuery, [identifier]);
+    const findResult = await pool.query("SELECT id FROM invoices WHERE id = $1", [identifier]);
 
     if (findResult.rows.length === 0) {
       return res.status(404).json({ error: 'Invoice not found' });
