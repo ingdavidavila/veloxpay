@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
+import { useRefreshOnFocus } from './useRefreshOnFocus';
 
 function Upload() {
   const { token } = useAuth();
@@ -88,6 +89,11 @@ function Upload() {
   };
 
   // Fetch clients
+  // Bumping this re-runs the fetch effect below. The fetch lives inside
+  // that effect, so this is the least invasive way to refetch.
+  const [refreshKey, setRefreshKey] = useState(0);
+  useRefreshOnFocus(() => setRefreshKey((k) => k + 1));
+
   useEffect(() => {
     const fetchClients = async () => {
       if (!token) return;
@@ -104,7 +110,7 @@ function Upload() {
       }
     };
     fetchClients();
-  }, [token]);
+  }, [token, refreshKey]);
 
   // Auto-calculate Due Date whenever termDays changes
   useEffect(() => {

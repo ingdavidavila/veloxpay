@@ -1,5 +1,5 @@
 // apps/mobile/src/screens/ProfileScreen.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { getToken, logout } from '@veloxpay/auth';
 import { apiUrl } from '../config/api';
 import { resetToAuth } from '../navigation/resetToAuth';
@@ -33,9 +34,11 @@ const ProfileScreen = ({ navigation }) => {
     approved: 0,
   });
 
-  useEffect(() => {
-    fetchProfileData();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchProfileData();
+    }, [])
+  );
 
   const fetchProfileData = async () => {
     try {

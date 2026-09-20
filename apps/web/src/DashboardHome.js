@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from './useAuth';
+import { useRefreshOnFocus } from './useRefreshOnFocus';
 import LoadingSpinner from './components/LoadingSpinner';
 
 function DashboardHome() {
@@ -24,6 +25,11 @@ function DashboardHome() {
     phone: ''
   });
   const [addingClient, setAddingClient] = useState(false);
+
+  // Bumping this re-runs the fetch effect below. The fetch lives inside
+  // that effect, so this is the least invasive way to refetch.
+  const [refreshKey, setRefreshKey] = useState(0);
+  useRefreshOnFocus(() => setRefreshKey((k) => k + 1));
 
   useEffect(() => {
     console.log('=== DashboardHome useEffect triggered ===');
@@ -95,7 +101,7 @@ function DashboardHome() {
     } else {
       setLoading(false);
     }
-  }, [user?.id, token]);
+  }, [user?.id, token, refreshKey]);
 
   const handleAddClient = () => {
     setShowAddClient(true);

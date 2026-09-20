@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './useAuth';
+import { useRefreshOnFocus } from './useRefreshOnFocus';
 import { usePlaidLink } from 'react-plaid-link';
 
 function Profile() {
@@ -29,6 +30,11 @@ function Profile() {
   });
 
   // Fetch user data and stats
+  // Bumping this re-runs the fetch effect below. The fetch lives inside
+  // that effect, so this is the least invasive way to refetch.
+  const [refreshKey, setRefreshKey] = useState(0);
+  useRefreshOnFocus(() => setRefreshKey((k) => k + 1));
+
   useEffect(() => {
     if (user) {
       setProfileData({
@@ -72,7 +78,7 @@ function Profile() {
     if (user?.id) {
       fetchStats();
     }
-  }, [user]);
+  }, [user, refreshKey]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;

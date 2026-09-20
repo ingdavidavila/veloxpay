@@ -1,5 +1,5 @@
 // apps/mobile/src/screens/DashboardScreen.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { getToken } from '@veloxpay/auth';
 import { apiUrl } from '../config/api';
 import { resetToAuth } from '../navigation/resetToAuth';
@@ -27,9 +28,15 @@ const DashboardScreen = ({ navigation }) => {
   });
   const [recentInvoices, setRecentInvoices] = useState([]);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
+  // useFocusEffect, not useEffect: this is a stack navigator, so the screen
+  // stays mounted while Upload is pushed on top of it. With useEffect the
+  // totals never refreshed after returning from an upload, and never picked
+  // up anything done on another device.
+  useFocusEffect(
+    useCallback(() => {
+      fetchDashboardData();
+    }, [])
+  );
 
   const fetchDashboardData = async () => {
     try {

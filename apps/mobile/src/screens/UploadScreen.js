@@ -1,5 +1,5 @@
 // apps/mobile/src/screens/UploadScreen.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { getToken } from '@veloxpay/auth';
 import { apiUrl } from '../config/api';
@@ -53,9 +54,13 @@ const UploadScreen = ({ navigation }) => {
     }
   };
 
-  useEffect(() => {
-    fetchClients();
-  }, []);
+  // Refresh the client list on focus so a client added on another device
+  // (or on web) shows up without restarting the app.
+  useFocusEffect(
+    useCallback(() => {
+      fetchClients();
+    }, [])
+  );
 
   const handleCreateClient = async () => {
     if (!newClient.name.trim()) {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
+import { useRefreshOnFocus } from './useRefreshOnFocus';
 
 function Invoices() {
   const { user } = useAuth();
@@ -7,6 +8,11 @@ function Invoices() {
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Bumping this re-runs the fetch effect below. The fetch lives inside
+  // that effect, so this is the least invasive way to refetch.
+  const [refreshKey, setRefreshKey] = useState(0);
+  useRefreshOnFocus(() => setRefreshKey((k) => k + 1));
 
   useEffect(() => {
    const fetchInvoices = async () => {
@@ -53,7 +59,7 @@ function Invoices() {
     if (user?.id) {
       fetchInvoices();
     }
-  }, [user?.id]);
+  }, [user?.id, refreshKey]);
 
   const getStatusIcon = (status) => {
     switch(status) {
