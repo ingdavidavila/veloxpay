@@ -31,7 +31,7 @@ function Home() {
       setCurrentTestimonial((prev) => (prev + 1) % testimonials.length);
     }, 6000);
     return () => clearInterval(interval);
-  }, []);
+  }, [testimonials.length]);
 
   return (
     <div className="landing-page premium-landing">

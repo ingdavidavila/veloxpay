@@ -1,5 +1,19 @@
 {
+  "name": "veloxpay",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "web": "cd apps/web && npm start",
+    "mobile": "cd apps/mobile && npx expo start",
+    "server": "cd server && npm start"
+  },
   "dependencies": {
-    "react-router-dom": "^7.13.1"
-  }
+    "react": "19.1.0",
+    "react-dom": "19.1.0"
+  },
+  "overrides": {}
 }

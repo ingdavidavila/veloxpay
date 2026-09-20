@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from './useAuth';
+import { useRefreshOnFocus } from './useRefreshOnFocus';
+import { useAuthFetch, isSessionExpired } from './useAuthFetch';
 import LoadingSpinner from './components/LoadingSpinner';
 
 function DashboardHome() {
@@ -25,6 +27,12 @@ function DashboardHome() {
   });
   const [addingClient, setAddingClient] = useState(false);
 
+  // Bumping this re-runs the fetch effect below. The fetch lives inside
+  // that effect, so this is the least invasive way to refetch.
+  const authFetch = useAuthFetch();
+  const [refreshKey, setRefreshKey] = useState(0);
+  useRefreshOnFocus(() => setRefreshKey((k) => k + 1));
+
   useEffect(() => {
     console.log('=== DashboardHome useEffect triggered ===');
     console.log('User from context:', user);
@@ -38,7 +46,7 @@ function DashboardHome() {
 
       try {
         console.log('Fetching stats with token...');
-        const response = await fetch('http://localhost:5000/api/invoices/stats', {
+        const response = await authFetch('http://localhost:5000/api/invoices/stats', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
 
@@ -59,6 +67,7 @@ function DashboardHome() {
           console.warn('Stats fetch failed with status:', response.status);
         }
       } catch (error) {
+        if (isSessionExpired(error)) return;
         console.error('Error fetching stats:', error);
       }
     };
@@ -71,7 +80,7 @@ function DashboardHome() {
 
       try {
         console.log('Fetching recent invoices with token...');
-        const response = await fetch('http://localhost:5000/api/invoices?limit=5', {
+        const response = await authFetch('http://localhost:5000/api/invoices?limit=5', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
 
@@ -83,6 +92,7 @@ function DashboardHome() {
           setRecentInvoices(data);
         }
       } catch (error) {
+        if (isSessionExpired(error)) return;
         console.error('Error fetching recent invoices:', error);
       } finally {
         setLoading(false);
@@ -95,7 +105,7 @@ function DashboardHome() {
     } else {
       setLoading(false);
     }
-  }, [user?.id, token]);
+  }, [user?.id, token, refreshKey]);
 
   const handleAddClient = () => {
     setShowAddClient(true);
@@ -117,7 +127,7 @@ function DashboardHome() {
     setAddingClient(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/clients', {
+      const response = await authFetch('http://localhost:5000/api/clients', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -259,7 +269,7 @@ function DashboardHome() {
           </div>
         ) : recentInvoices.length === 0 ? (
           <div className="text-center py-4">
-            <p>No invoices yet. <Link to="/upload">Create your first invoice</Link></p>
+            <p>No invoices yet. <Link to="/dashboard/upload">Create your first invoice</Link></p>
           </div>
         ) : (
           <>

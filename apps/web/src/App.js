@@ -1,4 +1,3 @@
-import logo from './logo.svg';
 import './App.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import { Routes, Route } from 'react-router-dom';
@@ -15,6 +14,7 @@ import DashboardHome from './DashboardHome';
 import Upload from './Upload';
 import Invoices from './Invoices';
 import Profile from './Profile';
+import CreateInvoice from './pages/CreateInvoice';
 import ApproveInvoice from './pages/ApproveInvoice';
 
 function App() {
@@ -33,6 +33,7 @@ function App() {
             <Route path="upload" element={<Upload />} />
             <Route path="invoices" element={<Invoices />} />
             <Route path="profile" element={<Profile />} />
+            <Route path="create-invoice" element={<CreateInvoice />} />
           </Route>
         </Routes>
       </GoogleOAuthProvider>

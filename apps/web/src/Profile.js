@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './useAuth';
+import { useRefreshOnFocus } from './useRefreshOnFocus';
+import { useAuthFetch, isSessionExpired } from './useAuthFetch';
 import { usePlaidLink } from 'react-plaid-link';
 
 function Profile() {
@@ -11,7 +13,14 @@ function Profile() {
   const [bankConnected, setBankConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   const [linkToken, setLinkToken] = useState(null);
-  const [setError] = useState(null);
+  // NB: this was `const [setError] = useState(null)`, which destructures the
+  // state VALUE (null) into a variable named setError -- so every setError(...)
+  // call threw "setError is not a function". The state name was missing.
+  const [error, setError] = useState(null);
+
+  // The updated_at we last read, sent back on save so the server can refuse
+  // a write built on a copy another device has already superseded.
+  const [profileVersion, setProfileVersion] = useState(null);
 
   const [profileData, setProfileData] = useState({
     businessName: '',
@@ -26,6 +35,12 @@ function Profile() {
   });
 
   // Fetch user data and stats
+  // Bumping this re-runs the fetch effect below. The fetch lives inside
+  // that effect, so this is the least invasive way to refetch.
+  const authFetch = useAuthFetch();
+  const [refreshKey, setRefreshKey] = useState(0);
+  useRefreshOnFocus(() => setRefreshKey((k) => k + 1));
+
   useEffect(() => {
     if (user) {
       setProfileData({
@@ -37,10 +52,33 @@ function Profile() {
       setBankConnected(!!user.supplier_plaid_access_token || !!user.has_bank_account);
     }
 
+    const fetchProfile = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await authFetch('http://localhost:5000/api/auth/me', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setProfileData({
+            businessName: data.business_name || data.name || '',
+            email: data.email || '',
+            phone: data.phone || '',
+          });
+          setProfileVersion(data.updated_at ?? null);
+          setBankConnected(!!data.has_bank_account);
+        }
+      } catch (error) {
+        if (isSessionExpired(error)) return;
+        console.error('Error fetching profile:', error);
+      }
+    };
+
     const fetchStats = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch('http://localhost:5000/api/invoices/stats', {
+        const response = await authFetch('http://localhost:5000/api/invoices/stats', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
 
@@ -48,11 +86,19 @@ function Profile() {
           const data = await response.json();
           setStats({
             totalInvoices: (data.pending || 0) + (data.approved || 0) + (data.paid || 0),
-            totalEarned: (data.pendingAmount || 0) + (data.approvedAmount || 0) + (data.paidAmount || 0),
+            // The API sends snake_case (pending_amount, ...). Reading
+            // camelCase here left all three undefined, so Total Earned was
+            // permanently $0. Number() guards against the values arriving as
+            // strings, which is what pg does with un-cast numeric columns.
+            totalEarned:
+              Number(data.pending_amount || 0) +
+              Number(data.approved_amount || 0) +
+              Number(data.paid_amount || 0),
             approved: data.approved || 0,
           });
         }
       } catch (error) {
+        if (isSessionExpired(error)) return;
         console.error('Error fetching stats:', error);
       } finally {
         setLoading(false);
@@ -60,9 +106,10 @@ function Profile() {
     };
 
     if (user?.id) {
+      fetchProfile();
       fetchStats();
     }
-  }, [user]);
+  }, [user, refreshKey]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -72,7 +119,7 @@ function Profile() {
   const handleSaveChanges = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/user/profile', {
+      const response = await authFetch('http://localhost:5000/api/user/profile', {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -81,18 +128,38 @@ function Profile() {
         body: JSON.stringify({
           business_name: profileData.businessName,
           phone: profileData.phone,
+          updated_at: profileVersion,
         })
       });
 
+      const data = await response.json().catch(() => ({}));
+
       if (response.ok) {
-        const updatedData = await response.json();
-        updateUser(updatedData.user);
+        updateUser(data.user);
+        // Adopt the new version so a second save this session is not rejected
+        // for carrying the one we read on load.
+        setProfileVersion(data.user?.updated_at ?? null);
         setIsEditing(false);
         alert('Profile updated successfully');
+      } else if (response.status === 409) {
+        // Changed elsewhere first. Show what it is now and take that version,
+        // so the user can decide rather than silently overwriting the other
+        // device's edit.
+        if (data.current) {
+          setProfileData({
+            businessName: data.current.business_name || data.current.name || '',
+            email: data.current.email || '',
+            phone: data.current.phone || '',
+          });
+          setProfileVersion(data.current.updated_at ?? null);
+        }
+        setIsEditing(false);
+        alert(data.error || 'This profile was changed on another device. Your changes were not saved.');
       } else {
-        alert('Failed to update profile');
+        alert(data.error || 'Failed to update profile');
       }
     } catch (error) {
+      if (isSessionExpired(error)) return;
       console.error('Error updating profile:', error);
       alert('Error updating profile');
     }
@@ -103,7 +170,7 @@ function Profile() {
     setError(null);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/plaid/supplier-link-token', {
+      const response = await authFetch('http://localhost:5000/api/plaid/supplier-link-token', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -118,6 +185,7 @@ function Profile() {
         setError(data.error || 'Failed to initialize bank connection');
       }
     } catch (err) {
+      if (isSessionExpired(err)) return;
       setError('Network error. Please try again.');
       console.error(err);
     }
@@ -127,7 +195,7 @@ function Profile() {
   const onPlaidSuccess = async (public_token, metadata) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/plaid/supplier-exchange-token', {
+      const response = await authFetch('http://localhost:5000/api/plaid/supplier-exchange-token', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -150,6 +218,7 @@ function Profile() {
         alert('Failed to save bank account. Please try again.');
       }
     } catch (err) {
+      if (isSessionExpired(err)) return;
       console.error(err);
       alert('Something went wrong while saving your bank account.');
     }
@@ -166,6 +235,30 @@ function Profile() {
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  // Signs out every device by bumping the account's token_version server
+  // side. Normal logout only deletes this browser's copy of the token --
+  // it stays valid elsewhere for its full 7 days.
+  const handleLogoutEverywhere = async () => {
+    if (!window.confirm('Sign out of all devices? You will need to log in again everywhere.')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      await fetch('http://localhost:5000/api/auth/logout-all', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+    } catch (err) {
+      console.error('Logout-all failed:', err);
+    } finally {
+      // Clear locally either way: if the call succeeded this token is dead,
+      // and if it failed the user still asked to be signed out here.
+      logout();
+      navigate('/login', { replace: true });
+    }
   };
 
   if (loading) return <p>Loading profile...</p>;
@@ -287,6 +380,14 @@ function Profile() {
             </div>
           </div>
 
+          {/* Bank-connection failures set `error`; without this they were
+              silent -- the fetch failed and the user saw nothing happen. */}
+          {error && (
+            <p style={{ color: '#c0392b', margin: '12px 0' }} role="alert">
+              {error}
+            </p>
+          )}
+
           {/* Show Plaid Open Button when linkToken is ready */}
           {linkToken && (
             <button 
@@ -339,6 +440,14 @@ function Profile() {
         {/* Logout Button */}
         <button className="logout-btn" onClick={handleLogout}>
           <i className="bi bi-box-arrow-right"></i> Log Out
+        </button>
+
+        <button
+          className="btn-cancel"
+          onClick={handleLogoutEverywhere}
+          style={{ marginTop: '8px', width: '100%' }}
+        >
+          Log out of all devices
         </button>
       </div>
     </main>

@@ -19,6 +19,28 @@ const { findOrCreateSocialUser } = require("../utils/socialAuth");
 
 const router = express.Router();
 
+// Mint an auth token carrying the user's current token_version, so it can be
+// revoked later by bumping that column. Reads the version itself rather than
+// trusting each call site to have selected it -- four call sites had already
+// drifted apart in what they loaded.
+const signAuthToken = async (userId, supplierId) => {
+  const result = await pool.query(
+    "SELECT token_version FROM users WHERE id = $1",
+    [userId]
+  );
+
+  return jwt.sign(
+    {
+      userId,
+      supplierId,
+      tokenVersion: result.rows[0]?.token_version ?? 0,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: "7d" }
+  );
+};
+
+
 // ======================
 // SIGNUP
 // ======================
@@ -47,14 +69,7 @@ const handleSignup = async (req, res) => {
       VALUES ($1, $2, $3, $4, $5, NOW())
     `, [supplierId, newUser.id, newUser.name, newUser.business_name || newUser.name, newUser.email]);
 
-    const token = jwt.sign(
-      { 
-        userId: newUser.id,
-        supplierId: supplierId 
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    const token = await signAuthToken(newUser.id, supplierId);
 
     res.status(201).json({
       message: "User created successfully",
@@ -132,14 +147,7 @@ const handleLogin = async (req, res) => {
     }
 
     // Create JWT with both userId and supplierId
-    const token = jwt.sign(
-      { 
-        userId: user.id,
-        supplierId: supplierId 
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    const token = await signAuthToken(user.id, supplierId);
 
     res.json({
       message: "Login successful",
@@ -250,8 +258,16 @@ router.post("/reset-password", async (req, res) => {
 
     const newPasswordHash = await bcrypt.hash(newPassword, 10);
 
+    // Bumping token_version signs out every existing session. A password
+    // reset is usually a response to a compromise, so leaving the old
+    // tokens working for another 7 days would defeat the point of it.
     await pool.query(
-      "UPDATE users SET password_hash = $1, reset_token = NULL, reset_token_expiry = NULL WHERE id = $2",
+      `UPDATE users
+         SET password_hash = $1,
+             reset_token = NULL,
+             reset_token_expiry = NULL,
+             token_version = token_version + 1
+       WHERE id = $2`,
       [newPasswordHash, userId]
     );
 
@@ -307,14 +323,7 @@ router.post("/google", async (req, res) => {
       supplierId = supplierCheck.rows[0].id;
     }
 
-    const token = jwt.sign(
-      { 
-        userId: result.user.id,
-        supplierId: supplierId 
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    const token = await signAuthToken(result.user.id, supplierId);
 
     res.json({
       message: "Google login successful",
@@ -366,14 +375,7 @@ router.post("/auth/apple", async (req, res) => {
       supplierId = supplierCheck.rows[0].id;
     }
 
-    const token = jwt.sign(
-      { 
-        userId: result.user.id,
-        supplierId: supplierId 
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    const token = await signAuthToken(result.user.id, supplierId);
 
     res.json({
       message: "Apple login successful",
@@ -388,6 +390,217 @@ router.post("/auth/apple", async (req, res) => {
   } catch (error) {
     console.error("Apple login error:", error);
     res.status(500).json({ error: "Apple login failed" });
+  }
+});
+
+// Shared shape for the profile record, so a 409 hands back exactly what a
+// fresh read would and the client can show the user what it actually is now.
+const fetchProfileRow = async (userId) => {
+  const result = await pool.query(
+    `SELECT id, name, business_name, email, phone_number AS phone,
+            avatar, created_at, updated_at
+       FROM users
+      WHERE id = $1`,
+    [userId]
+  );
+  return result.rows[0] ?? null;
+};
+
+// ======================
+// LOG OUT EVERYWHERE
+// ======================
+// POST /api/auth/logout-all
+// Clients delete their own copy of the token on a normal logout, which is
+// enough for that device. This is for the case that actually needs the
+// server: a lost or stolen phone, or a session the user no longer trusts.
+// Bumping token_version invalidates every token already issued, including
+// the one making this call.
+router.post("/auth/logout-all", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      return res.status(401).json({ error: "User ID not found in token. Please log in again." });
+    }
+
+    const result = await pool.query(
+      "UPDATE users SET token_version = token_version + 1 WHERE id = $1 RETURNING token_version",
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({
+      message: "Signed out of all devices. Please log in again.",
+      token_version: result.rows[0].token_version,
+    });
+  } catch (error) {
+    console.error("Logout-all error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ======================
+// CURRENT USER
+// ======================
+// GET /api/auth/me
+// Consumed by DashboardScreen.js and ProfileScreen.js, which read
+// business_name / name / email / phone and a bank-connected flag.
+//
+// The clients check `supplier_plaid_access_token || has_bank_account`, but we
+// deliberately do NOT return the Plaid access token -- that is a server-side
+// secret and must never reach a client. has_bank_account carries the same
+// signal, and the clients' || falls through to it.
+const handleMe = async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      return res.status(401).json({ error: "User ID not found in token. Please log in again." });
+    }
+
+    const result = await pool.query(
+      `
+      SELECT
+        u.id,
+        u.name,
+        u.business_name,
+        u.email,
+        u.phone_number AS phone,
+        u.avatar,
+        u.created_at,
+        -- Clients send this back on a profile update so the server can reject
+        -- a write based on a copy of the record that is already out of date.
+        u.updated_at,
+        s.id AS supplier_id,
+        COALESCE(s.bank_connected, FALSE) AS has_bank_account
+      FROM users u
+      LEFT JOIN suppliers s ON s.user_id = u.id
+      WHERE u.id = $1
+      `,
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error("Fetch current user error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+router.get("/auth/me", authenticateToken, handleMe);
+// Alias, matching the /signup + /auth/signup pairing used above.
+router.get("/me", authenticateToken, handleMe);
+
+// ======================
+// UPDATE PROFILE
+// ======================
+// PUT /api/user/profile
+// Consumed by ProfileScreen.js and apps/web/src/Profile.js, which both send
+// { business_name, phone } and expect { user } back.
+//
+// business_name is mirrored onto the supplier row because invoices join
+// suppliers for the display name -- leaving them out of sync would make an
+// edited profile show the old business name on every invoice.
+router.put("/user/profile", authenticateToken, async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      return res.status(401).json({ error: "User ID not found in token. Please log in again." });
+    }
+
+    const { business_name, phone, name, updated_at } = req.body;
+
+    await client.query("BEGIN");
+
+    // Optimistic concurrency. updated_at is the version the client last read
+    // (from /api/auth/me or a previous save). Conditioning the write on it
+    // means two devices editing the same profile can no longer silently
+    // overwrite each other -- the second one is told its copy is stale.
+    //
+    // Enforced only when the client sends it, so an older client keeps
+    // working rather than being locked out by a deploy. Both of ours send it.
+    if (updated_at) {
+      const expected = new Date(updated_at);
+
+      if (Number.isNaN(expected.getTime())) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({ error: "updated_at is not a valid timestamp" });
+      }
+
+      const current = await client.query(
+        "SELECT updated_at FROM users WHERE id = $1",
+        [userId]
+      );
+
+      if (current.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Compare instants, not strings: the client round-trips this through
+      // JSON, so the formatting will not match character for character.
+      if (current.rows[0].updated_at.getTime() !== expected.getTime()) {
+        await client.query("ROLLBACK");
+        return res.status(409).json({
+          error:
+            "This profile was changed on another device. Review the current details and try again.",
+          current: await fetchProfileRow(userId),
+        });
+      }
+    }
+
+    // COALESCE($n, column) leaves a field untouched when the client omits it,
+    // so a partial update cannot blank out the other fields.
+    const updated = await client.query(
+      `
+      UPDATE users
+      SET business_name = COALESCE($1, business_name),
+          phone_number  = COALESCE($2, phone_number),
+          name          = COALESCE($3, name),
+          updated_at    = NOW()
+      WHERE id = $4
+      RETURNING id, name, business_name, email, phone_number AS phone, avatar, created_at, updated_at
+      `,
+      [business_name ?? null, phone ?? null, name ?? null, userId]
+    );
+
+    if (updated.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    await client.query(
+      `
+      UPDATE suppliers
+      SET business_name = COALESCE($1, business_name),
+          name          = COALESCE($2, name)
+      WHERE user_id = $3
+      `,
+      [business_name ?? null, name ?? null, userId]
+    );
+
+    await client.query("COMMIT");
+
+    res.json({
+      message: "Profile updated successfully",
+      user: updated.rows[0],
+    });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Update profile error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  } finally {
+    client.release();
   }
 });
 

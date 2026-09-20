@@ -5,7 +5,7 @@ import { useAuth } from './useAuth';
 
 function Dashboard() {
   const navigate = useNavigate();
-  const { logout, user } = useAuth();
+  const { logout, user} = useAuth();
 
   const handleLogout = () => {
     logout();
@@ -21,6 +21,7 @@ function Dashboard() {
             <li><Link to="upload">Upload Invoice</Link></li>
             <li><Link to="invoices">All Invoices</Link></li>
             <li><Link to="profile">Profile</Link></li>
+            <li><Link to="create-invoice">Create Invoice</Link></li>
             <li><button className="logout-link" onClick={handleLogout}><i className="bi bi-box-arrow-right"></i> Log Out</button></li>
           </ul>
         </nav>

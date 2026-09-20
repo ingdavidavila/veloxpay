@@ -9,6 +9,11 @@ const authenticateToken = require('../middleware/auth.js');
 const pool = require('../db');
 const { triggerAdvanceAfterApproval } = require('../utils/invoiceService');
 
+// Public invoice routes accept an id and nothing else. Validating the shape
+// up front means a non-UUID never reaches Postgres, which would otherwise
+// raise 22P02 (invalid input syntax for type uuid) and surface as a 500.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // ====================== MULTER SETUP FOR FILE UPLOAD ======================
 const uploadDir = path.join(__dirname, '../uploads/invoices');
 if (!fs.existsSync(uploadDir)) {
@@ -132,7 +137,17 @@ router.post('/upload', authenticateToken, upload.single('file'), async (req, res
       try { fs.unlinkSync(req.file.path); } catch (e) { console.error("File cleanup failed:", e); }
     }
 
-    res.status(500).json({ error: error.message || "Failed to upload invoice" });
+    // Unique violation on (supplier_id, invoice_number): the supplier has
+    // already used this number. That is the caller's mistake, not a fault.
+    if (error.code === '23505') {
+      return res.status(409).json({
+        error: "You already have an invoice with that number. Use a different invoice number.",
+      });
+    }
+
+    // Don't echo error.message: it leaks Postgres constraint names and query
+    // internals to the client.
+    res.status(500).json({ error: "Failed to upload invoice" });
   }
 });
 
@@ -147,14 +162,18 @@ router.get('/stats', authenticateToken, async (req, res) => {
 
     console.log('Stats route - supplierId from JWT:', supplierId);   // ← Debug
 
+    // The ::int / ::float casts are load-bearing, not cosmetic.
+    // COUNT() returns bigint and SUM() returns numeric; node-postgres hands
+    // both back as STRINGS to avoid precision loss. Without these casts the
+    // clients do "0" + "0" + "0" and render "000" instead of 0.
     const statsQuery = `
       SELECT
-        COUNT(CASE WHEN status = 'pending' THEN 1 END) AS pending,
-        COUNT(CASE WHEN status = 'approved' THEN 1 END) AS approved,
-        COUNT(CASE WHEN status = 'paid' THEN 1 END) AS paid,
-        COALESCE(SUM(CASE WHEN status = 'pending' THEN total_amount ELSE 0 END), 0) AS pending_amount,
-        COALESCE(SUM(CASE WHEN status = 'approved' THEN total_amount ELSE 0 END), 0) AS approved_amount,
-        COALESCE(SUM(CASE WHEN status = 'paid' THEN total_amount ELSE 0 END), 0) AS paid_amount
+        COUNT(CASE WHEN status = 'pending' THEN 1 END)::int AS pending,
+        COUNT(CASE WHEN status = 'approved' THEN 1 END)::int AS approved,
+        COUNT(CASE WHEN status = 'paid' THEN 1 END)::int AS paid,
+        COALESCE(SUM(CASE WHEN status = 'pending' THEN total_amount ELSE 0 END), 0)::float AS pending_amount,
+        COALESCE(SUM(CASE WHEN status = 'approved' THEN total_amount ELSE 0 END), 0)::float AS approved_amount,
+        COALESCE(SUM(CASE WHEN status = 'paid' THEN total_amount ELSE 0 END), 0)::float AS paid_amount
       FROM invoices
       WHERE supplier_id = $1;
     `;
@@ -223,10 +242,14 @@ router.get('/:identifier/public', async (req, res) => {
   const identifier = req.params.identifier;
 
   try {
-    const isUUID = identifier.length > 30 && identifier.includes('-');
-    const query = isUUID 
-      ? "SELECT i.*, c.name as client_name, s.business_name FROM invoices i LEFT JOIN customers c ON c.id = i.customer_id LEFT JOIN suppliers s ON s.id = i.supplier_id WHERE i.id = $1"
-      : "SELECT i.*, c.name as client_name, s.business_name FROM invoices i LEFT JOIN customers c ON c.id = i.customer_id LEFT JOIN suppliers s ON s.id = i.supplier_id WHERE i.invoice_number = $1";
+    // Look up by id only. invoice_number is unique per supplier, not globally,
+    // so matching on it here could serve one supplier's invoice to another's
+    // client -- and sequential numbers would be trivially enumerable.
+    if (!UUID_RE.test(identifier)) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+
+    const query = "SELECT i.*, c.name as client_name, s.business_name FROM invoices i LEFT JOIN customers c ON c.id = i.customer_id LEFT JOIN suppliers s ON s.id = i.supplier_id WHERE i.id = $1";
 
     const result = await pool.query(query, [identifier]);
 
@@ -251,11 +274,13 @@ router.post('/:identifier/client-decision', async (req, res) => {
       return res.status(400).json({ error: 'Invalid decision' });
     }
 
-    const findQuery = identifier.includes('-') && identifier.length > 30 
-      ? "SELECT id FROM invoices WHERE id = $1" 
-      : "SELECT id FROM invoices WHERE invoice_number = $1";
+    // Same reasoning as /:identifier/public -- approving by invoice_number
+    // could act on a different supplier's invoice entirely.
+    if (!UUID_RE.test(identifier)) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
 
-    const findResult = await pool.query(findQuery, [identifier]);
+    const findResult = await pool.query("SELECT id FROM invoices WHERE id = $1", [identifier]);
 
     if (findResult.rows.length === 0) {
       return res.status(404).json({ error: 'Invoice not found' });
@@ -294,25 +319,102 @@ router.post('/:identifier/client-decision', async (req, res) => {
 });
 
 // ====================== GET CLIENTS FOR DROPDOWN ======================
-// Returns all customers (simple version - no supplier filter yet)
+// Scoped to the calling supplier. This previously returned every customer
+// row in the database to every supplier, which leaked one supplier's client
+// book -- names, contacts and DUNS numbers -- to all the others.
 router.get('/clients', authenticateToken, async (req, res) => {
   try {
+    const supplierId = req.user?.supplierId;
+
+    if (!supplierId) {
+      return res.status(401).json({ error: 'Supplier ID not found in token. Please log in again.' });
+    }
+
     const query = `
-      SELECT 
+      SELECT
         id,
         name,
+        duns_number,
+        contact_name,
         email,
-        phone
-      FROM customers 
+        phone,
+        address
+      FROM customers
+      WHERE supplier_id = $1
       ORDER BY name ASC;
     `;
 
-    const result = await pool.query(query);
+    const result = await pool.query(query, [supplierId]);
 
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching clients:', error);
     res.status(500).json({ error: 'Failed to fetch clients' });
+  }
+});
+
+// ====================== CREATE CLIENT ======================
+// POST /api/invoices/clients
+// Backs the "Add New Client" dialog on the upload screens.
+router.post('/clients', authenticateToken, async (req, res) => {
+  try {
+    const supplierId = req.user?.supplierId;
+
+    if (!supplierId) {
+      return res.status(401).json({ error: 'Supplier ID not found in token. Please log in again.' });
+    }
+
+    const { name, duns_number, contact_name, email, phone, address } = req.body;
+
+    if (!name || !String(name).trim()) {
+      return res.status(400).json({ error: 'Company name is required' });
+    }
+
+    // D&B numbers are exactly 9 digits. Accept the dashed form people copy
+    // from documents (12-345-6789) by stripping non-digits first.
+    let duns = null;
+    if (duns_number && String(duns_number).trim()) {
+      duns = String(duns_number).replace(/\D/g, '');
+      if (duns.length !== 9) {
+        return res.status(400).json({ error: 'DUNS number must be 9 digits' });
+      }
+    }
+
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim())) {
+      return res.status(400).json({ error: 'Please enter a valid email address' });
+    }
+
+    const result = await pool.query(
+      `
+      INSERT INTO customers (supplier_id, name, duns_number, contact_name, email, phone, address)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING id, name, duns_number, contact_name, email, phone, address
+      `,
+      [
+        supplierId,
+        String(name).trim(),
+        duns,
+        contact_name?.trim() || null,
+        email?.trim() || null,
+        phone?.trim() || null,
+        address?.trim() || null,
+      ]
+    );
+
+    res.status(201).json({ message: 'Client added successfully', client: result.rows[0] });
+  } catch (error) {
+    // Partial unique index on (supplier_id, duns_number).
+    if (error.code === '23505') {
+      return res.status(409).json({ error: 'You already have a client with that DUNS number' });
+    }
+    // The JWT stays valid for 7 days, so it can outlive the supplier row it
+    // names (deleted account). That is an auth problem, not a server fault --
+    // answer 401 so the client sends the user back to login.
+    if (error.code === '23503') {
+      return res.status(401).json({ error: 'Your session is no longer valid. Please log in again.' });
+    }
+    console.error('Error creating client:', error);
+    res.status(500).json({ error: 'Failed to create client' });
   }
 });
 

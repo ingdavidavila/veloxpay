@@ -817,7 +817,7 @@ body {
 
 /* Hero */
 .premium-hero {
-  min-height: 100vh;
+  min-height: 80vh;
   background: linear-gradient(135deg, #0a0a0a 0%, #1a3c2e 100%);
   display: flex;
   align-items: center;

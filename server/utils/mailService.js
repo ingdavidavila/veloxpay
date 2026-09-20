@@ -137,7 +137,11 @@ const sendRejectionNotificationToSupplier = async (supplierEmail, invoice) => {
 // ==================== INVOICE SENT FOR APPROVAL ====================
 const sendApprovalRequestEmail = async (clientEmail, invoice, supplierBusiness) => {
   try {
-    const approvalLink = `${FRONTEND_URL}/approve/${invoice.invoice_number}`;
+    // Link by id, never invoice_number. Numbers are only unique per supplier,
+    // so a number in a public URL is ambiguous -- and they are sequential, so
+    // anyone could walk INV-001, INV-002... and read or approve other people's
+    // invoices. The id is a UUID: unique and unguessable.
+    const approvalLink = `${FRONTEND_URL}/approve/${invoice.id}`;
 
     const { data, error } = await resend.emails.send({
       from: 'Resend <onboarding@resend.dev>',
