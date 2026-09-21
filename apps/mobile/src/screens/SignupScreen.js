@@ -69,7 +69,7 @@ const SignupScreen = ({ navigation }) => {
       const data = await response.json();
 
       if (response.ok && data.token) {
-        const saved = await saveAuthData(data.token, data.user || { email });
+        const saved = await saveAuthData(data.token, data.user || { email }, data.refreshToken);
 
         if (saved) {
           Alert.alert('✅ Welcome to VeloxPay!', 'Account created successfully');

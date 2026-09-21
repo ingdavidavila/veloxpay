@@ -79,7 +79,7 @@ function Signup() {
       setSuccess('Account created successfully! Logging you in...');
 
       setTimeout(() => {
-        login(data.token, data.user);
+        login(data.token, data.user, data.refreshToken);
         navigate('/dashboard');
       }, 1000);
 

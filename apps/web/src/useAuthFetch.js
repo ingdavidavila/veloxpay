@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './useAuth';
 
+const API_BASE = 'http://localhost:5000';
+
 /**
  * Thrown after a 401 has been handled, to stop the calling code carrying on
  * with a response it cannot use. Callers that show an error to the user
@@ -17,18 +19,69 @@ export class SessionExpiredError extends Error {
 export const isSessionExpired = (err) => err?.name === 'SessionExpiredError';
 
 /**
- * fetch() for authenticated calls, which clears the session and redirects to
- * /login on a 401.
+ * One shared refresh attempt.
  *
- * The server can now revoke a token before it expires -- "log out everywhere"
- * and password reset both do -- so a 401 no longer means only "expired". With
- * no handling, a revoked token left the app rendering blank dashboards and
- * empty lists: the server correctly refused every request and the UI never
- * said why.
+ * A screen typically fires several requests at once, so an expired access
+ * token produces several simultaneous 401s. Refreshing once per 401 would
+ * spend the same refresh token several times over, and the server treats a
+ * spent token as replay and revokes the whole family -- signing the user out
+ * precisely when everything was working correctly.
  *
- * Only use this for requests that carry an Authorization header. On the login
- * and password-reset screens a 401 means "wrong credentials", and signing the
- * user out in response to that would be nonsense.
+ * Module scope, not component state: the requests racing here come from
+ * different components.
+ */
+let inFlightRefresh = null;
+
+const refreshSession = async () => {
+  if (inFlightRefresh) return inFlightRefresh;
+
+  inFlightRefresh = (async () => {
+    const refreshToken = localStorage.getItem('refreshToken');
+    if (!refreshToken) return null;
+
+    try {
+      const response = await fetch(`${API_BASE}/api/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      });
+
+      if (!response.ok) return null;
+
+      const data = await response.json();
+      if (!data.token) return null;
+
+      localStorage.setItem('token', data.token);
+      if (data.refreshToken) {
+        localStorage.setItem('refreshToken', data.refreshToken);
+      }
+      return data.token;
+    } catch (err) {
+      console.error('Token refresh failed:', err);
+      return null;
+    } finally {
+      // Cleared in a microtask so callers that awaited this promise all see
+      // the same result before the next refresh can start.
+      setTimeout(() => {
+        inFlightRefresh = null;
+      }, 0);
+    }
+  })();
+
+  return inFlightRefresh;
+};
+
+/**
+ * fetch() for authenticated calls.
+ *
+ * Access tokens now last 15 minutes, so a 401 during ordinary use usually
+ * means "expired", not "revoked". It tries a refresh once and replays the
+ * original request; only if that fails does it clear the session and send
+ * the user to /login.
+ *
+ * Only for requests carrying an Authorization header. On the login and
+ * password-reset screens a 401 means wrong credentials, and signing the user
+ * out in response to that would be nonsense.
  */
 export function useAuthFetch() {
   const { logout } = useAuth();
@@ -43,13 +96,27 @@ export function useAuthFetch() {
   }, [logout]);
 
   return useCallback(
-    async (input, init) => {
-      const response = await fetch(input, init);
+    async (input, init = {}) => {
+      let response = await fetch(input, init);
 
       if (response.status === 401) {
-        logoutRef.current?.();
-        navigate('/login', { replace: true });
-        throw new SessionExpiredError();
+        const newToken = await refreshSession();
+
+        if (newToken) {
+          // Replay with the new token, keeping whatever headers the caller
+          // set. Its Authorization header carries the stale token.
+          const retryInit = {
+            ...init,
+            headers: { ...(init.headers || {}), Authorization: `Bearer ${newToken}` },
+          };
+          response = await fetch(input, retryInit);
+        }
+
+        if (response.status === 401) {
+          logoutRef.current?.();
+          navigate('/login', { replace: true });
+          throw new SessionExpiredError();
+        }
       }
 
       return response;

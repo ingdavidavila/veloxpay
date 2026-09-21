@@ -52,7 +52,7 @@ function Login() {
       }
 
       const data = await response.json();
-      login(data.token, data.user);
+      login(data.token, data.user, data.refreshToken);
       navigate('/dashboard');
     } catch (error) {
       console.error('Login error:', error);
@@ -76,7 +76,7 @@ function Login() {
         }
 
         const data = await response.json();
-        login(data.token, data.user);
+        login(data.token, data.user, data.refreshToken);
         navigate('/dashboard');
       } catch (error) {
         console.error('Google login error:', error);
