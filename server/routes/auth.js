@@ -19,8 +19,14 @@ const { findOrCreateSocialUser } = require("../utils/socialAuth");
 
 const router = express.Router();
 
-// Mint an auth token carrying the user's current token_version, so it can be
-// revoked later by bumping that column. Reads the version itself rather than
+// Access tokens are deliberately short-lived. A stolen one is only useful for
+// minutes, and the refresh token that replaces it is revocable because it is
+// stored server side. Before this, a single 7-day token was the whole session.
+const ACCESS_TOKEN_TTL = "15m";
+const REFRESH_TOKEN_TTL_DAYS = 30;
+
+// Mint an access token carrying the user's current token_version, so it can be
+// revoked by bumping that column. Reads the version itself rather than
 // trusting each call site to have selected it -- four call sites had already
 // drifted apart in what they loaded.
 const signAuthToken = async (userId, supplierId) => {
@@ -36,9 +42,32 @@ const signAuthToken = async (userId, supplierId) => {
       tokenVersion: result.rows[0]?.token_version ?? 0,
     },
     process.env.JWT_SECRET,
-    { expiresIn: "7d" }
+    { expiresIn: ACCESS_TOKEN_TTL }
   );
 };
+
+const hashToken = (raw) => crypto.createHash("sha256").update(raw).digest("hex");
+
+// Issue a refresh token. familyId continues an existing rotation chain, or
+// starts a new one at login.
+const issueRefreshToken = async (userId, familyId = null) => {
+  const raw = crypto.randomBytes(48).toString("hex");
+  const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000);
+
+  await pool.query(
+    `INSERT INTO refresh_tokens (user_id, token_hash, family_id, expires_at)
+     VALUES ($1, $2, COALESCE($3, gen_random_uuid()), $4)`,
+    [userId, hashToken(raw), familyId, expiresAt]
+  );
+
+  return raw;
+};
+
+// Both halves of a session, for the four places that start one.
+const issueSession = async (userId, supplierId) => ({
+  token: await signAuthToken(userId, supplierId),
+  refreshToken: await issueRefreshToken(userId),
+});
 
 
 // ======================
@@ -69,11 +98,12 @@ const handleSignup = async (req, res) => {
       VALUES ($1, $2, $3, $4, $5, NOW())
     `, [supplierId, newUser.id, newUser.name, newUser.business_name || newUser.name, newUser.email]);
 
-    const token = await signAuthToken(newUser.id, supplierId);
+    const { token, refreshToken } = await issueSession(newUser.id, supplierId);
 
     res.status(201).json({
       message: "User created successfully",
       token,
+      refreshToken,
       user: newUser
     });
   } catch (error) {
@@ -147,11 +177,12 @@ const handleLogin = async (req, res) => {
     }
 
     // Create JWT with both userId and supplierId
-    const token = await signAuthToken(user.id, supplierId);
+    const { token, refreshToken } = await issueSession(user.id, supplierId);
 
     res.json({
       message: "Login successful",
       token,
+      refreshToken,
       user: {
         id: user.id,
         name: user.name,
@@ -271,6 +302,13 @@ router.post("/reset-password", async (req, res) => {
       [newPasswordHash, userId]
     );
 
+    // Same reasoning as logout-all: a live refresh token would undo the
+    // access-token revocation within minutes.
+    await pool.query(
+      "UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL",
+      [userId]
+    );
+
     await sendPasswordResetConfirmation(userEmail).catch(err => 
       console.warn("Password reset confirmation email failed:", err)
     );
@@ -323,11 +361,12 @@ router.post("/google", async (req, res) => {
       supplierId = supplierCheck.rows[0].id;
     }
 
-    const token = await signAuthToken(result.user.id, supplierId);
+    const { token, refreshToken } = await issueSession(result.user.id, supplierId);
 
     res.json({
       message: "Google login successful",
       token,
+      refreshToken,
       user: {
         id: result.user.id,
         name: result.user.name,
@@ -375,11 +414,12 @@ router.post("/auth/apple", async (req, res) => {
       supplierId = supplierCheck.rows[0].id;
     }
 
-    const token = await signAuthToken(result.user.id, supplierId);
+    const { token, refreshToken } = await issueSession(result.user.id, supplierId);
 
     res.json({
       message: "Apple login successful",
       token,
+      refreshToken,
       user: {
         id: result.user.id,
         name: result.user.name,
@@ -407,6 +447,88 @@ const fetchProfileRow = async (userId) => {
 };
 
 // ======================
+// REFRESH
+// ======================
+// POST /api/auth/refresh  { refreshToken }
+// Unauthenticated on purpose: the access token it replaces has usually
+// expired, which is the whole reason for calling this.
+router.post("/auth/refresh", async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      return res.status(400).json({ error: "refreshToken is required" });
+    }
+
+    await client.query("BEGIN");
+
+    // FOR UPDATE so two tabs refreshing at once cannot both spend the same
+    // token and trip the reuse detection below on a perfectly honest client.
+    const found = await client.query(
+      `SELECT id, user_id, family_id, expires_at, used_at, revoked_at
+         FROM refresh_tokens
+        WHERE token_hash = $1
+        FOR UPDATE`,
+      [hashToken(refreshToken)]
+    );
+
+    if (found.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(401).json({ error: "Invalid refresh token. Please log in again." });
+    }
+
+    const row = found.rows[0];
+
+    // Replay of a spent token. Either someone copied it, or a stolen copy is
+    // racing the real client -- and we cannot tell which, so we end the whole
+    // chain and make the real user log in again.
+    if (row.used_at) {
+      await client.query(
+        "UPDATE refresh_tokens SET revoked_at = NOW() WHERE family_id = $1 AND revoked_at IS NULL",
+        [row.family_id]
+      );
+      await client.query("COMMIT");
+      console.warn("Refresh token reuse detected; revoked family", row.family_id);
+      return res.status(401).json({ error: "Session ended for security reasons. Please log in again." });
+    }
+
+    if (row.revoked_at) {
+      await client.query("ROLLBACK");
+      return res.status(401).json({ error: "Session has been signed out. Please log in again." });
+    }
+
+    if (new Date(row.expires_at).getTime() <= Date.now()) {
+      await client.query("ROLLBACK");
+      return res.status(401).json({ error: "Session expired. Please log in again." });
+    }
+
+    // Spend the presented token, then hand back a new one in the same family.
+    await client.query("UPDATE refresh_tokens SET used_at = NOW() WHERE id = $1", [row.id]);
+
+    const supplierResult = await client.query(
+      "SELECT id FROM suppliers WHERE user_id = $1 LIMIT 1",
+      [row.user_id]
+    );
+
+    await client.query("COMMIT");
+
+    const supplierId = supplierResult.rows[0]?.id ?? null;
+    const token = await signAuthToken(row.user_id, supplierId);
+    const nextRefreshToken = await issueRefreshToken(row.user_id, row.family_id);
+
+    res.json({ token, refreshToken: nextRefreshToken });
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => {});
+    console.error("Refresh error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  } finally {
+    client.release();
+  }
+});
+
+// ======================
 // LOG OUT EVERYWHERE
 // ======================
 // POST /api/auth/logout-all
@@ -425,6 +547,14 @@ router.post("/auth/logout-all", authenticateToken, async (req, res) => {
 
     const result = await pool.query(
       "UPDATE users SET token_version = token_version + 1 WHERE id = $1 RETURNING token_version",
+      [userId]
+    );
+
+    // Bumping token_version only kills access tokens. Without this, any live
+    // refresh token would immediately mint a fresh one and the "log out"
+    // would last about fifteen minutes.
+    await pool.query(
+      "UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL",
       [userId]
     );
 

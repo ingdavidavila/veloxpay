@@ -30,7 +30,16 @@ const authenticateToken = (req, res, next) => {
 
   jwt.verify(token, process.env.JWT_SECRET, async (err, payload) => {
     if (err) {
-      return res.status(403).json({ error: 'Invalid or expired token' });
+      // 401, not 403. These are all "we do not know who you are", which is
+      // what 401 means; 403 is "we know, and you may not". It also matters
+      // operationally: clients refresh on 401, and access tokens are only
+      // 15 minutes, so expiry is the common case. Answering 403 here meant
+      // an expired token could never be refreshed.
+      const expired = err.name === 'TokenExpiredError';
+      return res.status(401).json({
+        error: expired ? 'Access token expired' : 'Invalid token',
+        expired,
+      });
     }
 
     try {

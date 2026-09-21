@@ -144,6 +144,35 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_invoices_supplier_invoice_number
 
 
 -- ============================================================
+-- refresh_tokens  (routes/auth.js)
+-- ============================================================
+-- Access tokens are short-lived (15 minutes), so a stolen one expires on its
+-- own. Refresh tokens are the long-lived half and live here rather than being
+-- self-contained, because that is what makes them revocable.
+--
+-- Rotation: every refresh spends the presented token and issues a new one in
+-- the same family. Presenting an already-spent token means either a replay or
+-- a stolen copy racing the real client, and neither is safe to serve, so the
+-- whole family is revoked and the user re-authenticates.
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  -- SHA-256 of the token, never the token itself: a leaked database must not
+  -- hand over usable credentials. Same reasoning as users.reset_token.
+  token_hash TEXT NOT NULL UNIQUE,
+  family_id  UUID NOT NULL,
+  expires_at TIMESTAMP NOT NULL,
+  used_at    TIMESTAMP,
+  revoked_at TIMESTAMP,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens (user_id);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_family  ON refresh_tokens (family_id);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires ON refresh_tokens (expires_at);
+
+
+-- ============================================================
 -- Upgrades for databases created before a column existed
 -- ============================================================
 -- CREATE TABLE IF NOT EXISTS does nothing when the table already exists, so
